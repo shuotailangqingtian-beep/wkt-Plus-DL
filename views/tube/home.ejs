@@ -106,6 +106,7 @@
             width: 100%;
             height: 100%;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             position: absolute;
@@ -128,6 +129,7 @@
             color: white;
             text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
             pointer-events: none;
+            z-index: 10002;
         }
         .shorts-controls {
             position: absolute;
@@ -346,7 +348,7 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
 });
 
 // ==========================================
-// Shorts 機能の実装
+// Shorts 機能の実装 (動画再生と同じストリーム取得方式)
 // ==========================================
 (function() {
     let shortsList = [];
@@ -368,18 +370,18 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
         overlay.classList.remove('active');
         const currentVideo = container.querySelector('video');
         if (currentVideo) currentVideo.pause();
+        const currentAudio = container.querySelector('audio');
+        if (currentAudio) currentAudio.pause();
     });
 
     async function loadShorts() {
         loading.style.display = 'block';
         container.innerHTML = '';
         
-        // 検索履歴を取得（localStorageから）
         let history = JSON.parse(localStorage.getItem('wakametubeserhistory') || '[]');
         let query = history.length > 0 ? history[history.length - 1] : 'Shorts';
         
         try {
-            // 100本取得するために複数回リクエスト
             let videos = [];
             const searchTerms = [query, 'Shorts', 'ショート動画', '面白動画'];
             
@@ -426,28 +428,42 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
         const wrapper = document.createElement('div');
         wrapper.className = 'shorts-video-wrapper';
         
-        // ストリームURLを取得
         try {
-            // getvideoコントローラーに相当するAPIを叩く
+            // watch.ejs と同じように /wkt/back/next/${id} からストリーム情報を取得
             const res = await fetch(`/wkt/back/next/${videoData.id}`);
             const data = await res.json();
             
-            // 画質を720p付近に固定するための選択
-            let streamUrl = data.stream_url;
+            // 720p 固定の選択ロジック
+            let videoUrl = data.stream_url;
+            let audioUrl = data.audioUrl || '';
+
             if (data.streamUrls) {
-                const target = data.streamUrls.find(s => s.resolution && s.resolution.includes('720')) || data.streamUrls[0];
-                if (target) streamUrl = target.url;
+                // 720p の MP4 を探す
+                const target = data.streamUrls.find(s => s.resolution && s.resolution.includes('720') && s.container === 'mp4') 
+                             || data.streamUrls.find(s => s.resolution && s.resolution.includes('720'))
+                             || data.streamUrls[0];
+                if (target) videoUrl = target.url;
             }
 
+            // watch.ejs と同じく video + audio の構成
             wrapper.innerHTML = `
-                <video src="${streamUrl}" loop playsinline></video>
+                <video id="shortsVideo" src="${videoUrl}" loop playsinline style="width:100%; height:100%;"></video>
+                <audio id="shortsAudio" src="${audioUrl}" loop></audio>
                 <div class="shorts-info">
                     <h3 class="font-bold text-xl">${videoData.title}</h3>
                     <p class="text-sm opacity-80">${videoData.author}</p>
                 </div>
             `;
             container.appendChild(wrapper);
-            const video = wrapper.querySelector('video');
+            
+            const video = wrapper.querySelector('#shortsVideo');
+            const audio = wrapper.querySelector('#shortsAudio');
+
+            // 同期再生ロジック (watch.ejs 準拠)
+            video.onplay = () => { if (audio.src && audio.src !== window.location.href) audio.play(); };
+            video.onpause = () => { audio.pause(); };
+            video.onseeking = () => { audio.currentTime = video.currentTime; };
+
             video.play().catch(e => {
                 video.muted = true;
                 video.play();
@@ -467,7 +483,6 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
         if (currentIndex > 0) playShort(currentIndex - 1);
     });
 
-    // スワイプ操作の実装
     let touchStartY = 0;
     container.addEventListener('touchstart', e => touchStartY = e.touches[0].clientY);
     container.addEventListener('touchend', e => {

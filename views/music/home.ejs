@@ -25,7 +25,7 @@
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             gap: 20px;
             max-width: 800px;
-            margin: 30px auto;
+            margin: 20px auto;
         }
         .artist-item {
             background: #1f2937;
@@ -45,6 +45,20 @@
             margin: 0 auto 10px;
             object-fit: cover;
         }
+        .search-bar {
+            max-width: 500px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 12px 20px;
+            border-radius: 25px;
+            background: #374151;
+            border: none;
+            color: white;
+            outline: none;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col items-center">
@@ -52,14 +66,25 @@
 <!-- アーティスト選択オーバーレイ -->
 <div id="artistSelector">
     <div class="max-w-2xl mx-auto text-center">
-        <h1 class="text-3xl font-bold mb-4">好きなアーティストを3つ選んでください</h1>
-        <p class="text-gray-400 mb-8">あなたにぴったりの音楽をおすすめします。</p>
-        <div class="artist-grid" id="artistGrid">
-            <!-- JSで動的に追加 -->
+        <h1 class="text-3xl font-bold mb-4">好きなアーティストを選んでください</h1>
+        <p class="text-gray-400 mb-6">検索して追加することもできます。</p>
+        
+        <div class="search-bar">
+            <input type="text" id="artistSearchInput" placeholder="アーティストを検索して追加...">
         </div>
-        <button id="finishSelection" class="mt-8 px-10 py-3 bg-blue-600 hover:bg-blue-700 rounded-full font-bold text-lg transition-colors opacity-50 cursor-not-allowed" disabled>
-            開始する
-        </button>
+
+        <div class="artist-grid" id="artistGrid">
+            <!-- 動的に追加 -->
+        </div>
+        
+        <div class="flex justify-center gap-4">
+            <button id="finishSelection" class="mt-8 px-10 py-3 bg-blue-600 hover:bg-blue-700 rounded-full font-bold text-lg transition-colors opacity-50 cursor-not-allowed" disabled>
+                開始する
+            </button>
+            <button id="resetSelection" class="mt-8 px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-full font-bold transition-colors">
+                リセット
+            </button>
+        </div>
     </div>
 </div>
 
@@ -73,7 +98,10 @@
         <button type="submit" class="p-2 bg-blue-600 rounded hover:bg-blue-500 transition">🔍</button>
     </form>
 
-    <button onclick="window.location.href='/wakams/f'" class="p-2 bg-yellow-500 rounded hover:bg-yellow-400 transition whitespace-nowrap">⭐ お気に入り</button>
+    <div class="flex gap-2">
+        <button id="reselectArtists" class="p-2 bg-gray-700 rounded hover:bg-gray-600 transition" title="アーティストを再選択">👤</button>
+        <button onclick="window.location.href='/wakams/f'" class="p-2 bg-yellow-500 rounded hover:bg-yellow-400 transition whitespace-nowrap">⭐ お気に入り</button>
+    </div>
 </header>
 
 <main class="p-4 w-full max-w-2xl">
@@ -126,8 +154,8 @@
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script>
-    // --- アーティスト選択 & パーソナライズ ---
-    const artists = [
+    // --- アーティスト選択 (全アーティスト対応) ---
+    const defaultArtists = [
         { name: 'YOASOBI', img: 'https://www.yoasobi-music.jp/img/profile.jpg' },
         { name: '米津玄師', img: 'https://reissuerecords.net/common/img/profile_photo.jpg' },
         { name: 'Official髭男dism', img: 'https://higedan.com/wp-content/uploads/2021/02/artist_photo_2021.jpg' },
@@ -135,29 +163,45 @@
         { name: 'Vaundy', img: 'https://vaundy.jp/img/profile.jpg' },
         { name: 'Mrs. GREEN APPLE', img: 'https://mrsgreenapple.com/img/profile.jpg' },
         { name: 'King Gnu', img: 'https://kinggnu.jp/img/profile.jpg' },
-        { name: '優里', img: 'https://www.yuuri-music.com/img/profile.jpg' }
+        { name: '優里', img: 'https://www.yuuri-music.com/img/profile.jpg' },
+        { name: 'Eve', img: 'https://eveofficial.com/wp-content/uploads/2020/02/eve_profile.jpg' },
+        { name: 'ずとまよ', img: 'https://zutomayo.net/img/profile.jpg' }
     ];
 
-    const selectedArtists = new Set();
+    let selectedArtists = new Set();
     const artistSelector = document.getElementById('artistSelector');
     const artistGrid = document.getElementById('artistGrid');
     const finishBtn = document.getElementById('finishSelection');
+    const searchInput = document.getElementById('artistSearchInput');
 
-    // 初期化
     window.addEventListener('load', () => {
-        if (!localStorage.getItem('music_artists_selected')) {
+        const saved = localStorage.getItem('music_artists_selected');
+        if (!saved) {
             showArtistSelector();
         } else {
+            selectedArtists = new Set(JSON.parse(saved));
             loadRecommendations();
         }
     });
 
+    document.getElementById('reselectArtists').onclick = showArtistSelector;
+    document.getElementById('resetSelection').onclick = () => {
+        selectedArtists.clear();
+        renderArtists(defaultArtists);
+        updateFinishBtn();
+    };
+
     function showArtistSelector() {
         artistSelector.classList.add('active');
+        renderArtists(defaultArtists);
+        updateFinishBtn();
+    }
+
+    function renderArtists(list) {
         artistGrid.innerHTML = '';
-        artists.forEach(artist => {
+        list.forEach(artist => {
             const div = document.createElement('div');
-            div.className = 'artist-item';
+            div.className = 'artist-item' + (selectedArtists.has(artist.name) ? ' selected' : '');
             div.innerHTML = `
                 <img src="${artist.img}" onerror="this.src='https://wsrv.nl/?url=https://icooon-mono.com/i/icon_10173/icon_101730_256.png'">
                 <p class="font-bold">${artist.name}</p>
@@ -170,23 +214,39 @@
                     selectedArtists.add(artist.name);
                     div.classList.add('selected');
                 }
-                finishBtn.disabled = selectedArtists.size < 3;
-                finishBtn.style.opacity = selectedArtists.size >= 3 ? '1' : '0.5';
-                finishBtn.classList.toggle('cursor-not-allowed', selectedArtists.size < 3);
+                updateFinishBtn();
             };
             artistGrid.appendChild(div);
         });
     }
 
+    function updateFinishBtn() {
+        finishBtn.disabled = selectedArtists.size < 1;
+        finishBtn.style.opacity = selectedArtists.size >= 1 ? '1' : '0.5';
+        finishBtn.classList.toggle('cursor-not-allowed', selectedArtists.size < 1);
+    }
+
+    searchInput.oninput = async (e) => {
+        const q = e.target.value.trim();
+        if (q.length < 2) {
+            renderArtists(defaultArtists);
+            return;
+        }
+        // 簡易的な検索（実際にはAPIを叩くことも可能）
+        // ここでは入力された名前をリストの先頭に追加して選択可能にする
+        const newList = [{ name: q, img: '' }, ...defaultArtists.filter(a => a.name !== q)];
+        renderArtists(newList);
+    };
+
     finishBtn.onclick = () => {
         localStorage.setItem('music_artists_selected', JSON.stringify(Array.from(selectedArtists)));
         artistSelector.classList.remove('active');
         loadRecommendations();
-        showMessage('設定が完了しました！おすすめを表示します。');
+        showMessage('音楽の好みを保存しました！');
     };
 
     async function loadRecommendations() {
-        const selected = JSON.parse(localStorage.getItem('music_artists_selected') || '[]');
+        const selected = Array.from(selectedArtists);
         if (selected.length === 0) return;
 
         const recSection = document.getElementById('recommendationSection');
@@ -198,13 +258,7 @@
         recList.innerHTML = '<p class="text-gray-400">読み込み中...</p>';
 
         try {
-            // アーティスト名で検索
             const randomArtist = selected[Math.floor(Math.random() * selected.length)];
-            const res = await fetch(`/wakams/s?q=${encodeURIComponent(randomArtist)}&ajax=true`);
-            // 注: サーバー側がAJAX対応していない場合を考慮し、通常はfetch後にパースする
-            // ここでは簡易的に、現在のリストからランダムに表示するか、再検索を促す
-            
-            // 実際には /wakams/s にリクエストを送って結果を取得する
             const response = await fetch(`/wakams/s?q=${encodeURIComponent(randomArtist)}`);
             const html = await response.text();
             const parser = new DOMParser();
@@ -214,7 +268,7 @@
             recList.innerHTML = '';
             let count = 0;
             tracks.forEach(btn => {
-                if (count >= 3) return;
+                if (count >= 5) return;
                 const id = btn.getAttribute('data-track-id');
                 const parent = btn.closest('div').parentElement;
                 const title = parent.querySelector('.font-bold').textContent;
@@ -250,7 +304,6 @@
             const trackId = this.getAttribute('data-track-id');
             const title = this.closest('.track-item').querySelector('.font-bold').textContent;
             
-            // プレイリストの構築
             const allTracks = Array.from(document.querySelectorAll('.track-item'));
             currentPlaylist = allTracks.map(el => ({
                 id: el.getAttribute('data-id'),
@@ -271,7 +324,6 @@
         player.src = `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${trackId}&color=%233b82f6&auto_play=true&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true`;
         playerContainer.classList.remove('hidden');
 
-        // SoundCloud Widget API の初期化
         if (!widget) {
             widget = SC.Widget(player);
             widget.bind(SC.Widget.Events.FINISH, () => {
@@ -282,15 +334,13 @@
 
     async function playNext() {
         if (currentTrackIndex !== -1 && currentTrackIndex < currentPlaylist.length - 1) {
-            // リスト内の次の曲
             currentTrackIndex++;
             const next = currentPlaylist[currentTrackIndex];
             playTrack(next.id, next.title);
         } else {
-            // リストが終わった、または検索結果がない場合、自動でおすすめを取得して再生
             showMessage('次の曲を自動取得しています...');
-            const selected = JSON.parse(localStorage.getItem('music_artists_selected') || '["J-POP"]');
-            const randomQuery = selected[Math.floor(Math.random() * selected.length)];
+            const selected = Array.from(selectedArtists);
+            const randomQuery = selected.length > 0 ? selected[Math.floor(Math.random() * selected.length)] : 'J-POP';
             
             try {
                 const response = await fetch(`/wakams/s?q=${encodeURIComponent(randomQuery)}`);
