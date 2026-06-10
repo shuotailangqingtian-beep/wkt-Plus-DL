@@ -168,6 +168,7 @@
             transform: translate(-50%, -50%);
             color: white;
             text-align: center;
+            z-index: 10003;
         }
     </style>
 </head>
@@ -201,7 +202,7 @@
             <a href="/blog/b/wkthelp"><h1 class="text-4xl font-bold text-white mb-4">わかめtube Plus</h1></a>
             <p class="text-lg text-gray-400 mb-6">好きな動画を検索してみましょう！</p>
             <form action="/wkt/s" method="get" id="searchForm">
-              <input type="text" name="q" id="searchbox" placeholder="キーワード、もしくはYouTubeのURLを入力..." class="searchbox">
+              <input type="text" name="q" id="searchbox" placeholder="キーワード、もしくはYouTube의 URLを入力..." class="searchbox">
             </form>
         </div>
     </section>
@@ -262,7 +263,7 @@
     <!-- Shorts オーバーレイ UI -->
     <div id="shortsOverlay">
         <div class="shorts-close" id="shortsClose">×</div>
-        <div id="shortsLoading">動画を読み込み中...<br>(100本取得しています)</div>
+        <div id="shortsLoading" style="display:none;">動画を読み込み中...</div>
         <div class="shorts-container" id="shortsContainer">
             <!-- 動画がここに動的に追加される -->
         </div>
@@ -348,11 +349,14 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
 });
 
 // ==========================================
-// Shorts 機能の実装 (動画再生と同じストリーム取得方式)
+// Shorts 機能の実装 (10本ずつのバッチ読み込み)
 // ==========================================
 (function() {
     let shortsList = [];
     let currentIndex = 0;
+    let isLoading = false;
+    let searchTerms = [];
+    let termIndex = 0;
     const overlay = document.getElementById('shortsOverlay');
     const container = document.getElementById('shortsContainer');
     const loading = document.getElementById('shortsLoading');
@@ -360,7 +364,8 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
     document.getElementById('shortsBtn').addEventListener('click', async () => {
         overlay.classList.add('active');
         if (shortsList.length === 0) {
-            await loadShorts();
+            initSearchTerms();
+            await loadMoreShorts();
         } else {
             playShort(currentIndex);
         }
@@ -374,19 +379,24 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
         if (currentAudio) currentAudio.pause();
     });
 
-    async function loadShorts() {
-        loading.style.display = 'block';
-        container.innerHTML = '';
-        
+    function initSearchTerms() {
         let history = JSON.parse(localStorage.getItem('wakametubeserhistory') || '[]');
         let query = history.length > 0 ? history[history.length - 1] : 'Shorts';
+        searchTerms = [query, 'Shorts', 'ショート動画', '面白動画', 'トレンド', '歌ってみた'];
+        termIndex = 0;
+        shortsList = [];
+        currentIndex = 0;
+    }
+
+    async function loadMoreShorts() {
+        if (isLoading) return;
+        isLoading = true;
+        loading.style.display = 'block';
         
         try {
-            let videos = [];
-            const searchTerms = [query, 'Shorts', 'ショート動画', '面白動画'];
-            
-            for (let term of searchTerms) {
-                if (videos.length >= 100) break;
+            let newVideos = [];
+            while (newVideos.length < 10 && termIndex < searchTerms.length) {
+                const term = searchTerms[termIndex];
                 const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(term)}&type=video`);
                 const html = await res.text();
                 const parser = new DOMParser();
@@ -399,23 +409,28 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
                         const id = link.href.split('/').pop();
                         const title = item.querySelector('.font-bold')?.textContent || '';
                         const author = item.querySelector('.text-gray-400')?.textContent || '';
-                        if (!videos.find(v => v.id === id)) {
-                            videos.push({ id, title, author });
+                        if (!shortsList.find(v => v.id === id) && !newVideos.find(v => v.id === id)) {
+                            newVideos.push({ id, title, author });
                         }
                     }
                 });
+                termIndex++;
             }
             
-            shortsList = videos.slice(0, 100);
-            loading.style.display = 'none';
-            if (shortsList.length > 0) {
-                playShort(0);
-            } else {
+            if (newVideos.length > 0) {
+                const isFirstLoad = shortsList.length === 0;
+                shortsList = shortsList.concat(newVideos);
+                if (isFirstLoad) playShort(0);
+                else showMessage('次の10本を読み込みました');
+            } else if (shortsList.length === 0) {
                 loading.textContent = '動画が見つかりませんでした。';
             }
         } catch (e) {
             console.error(e);
-            loading.textContent = 'エラーが発生しました。';
+            if (shortsList.length === 0) loading.textContent = 'エラーが発生しました。';
+        } finally {
+            isLoading = false;
+            loading.style.display = 'none';
         }
     }
 
@@ -424,28 +439,29 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
         currentIndex = index;
         container.innerHTML = '';
         
+        // 残り3本になったら次の10本を読み込む
+        if (index >= shortsList.length - 3 && !isLoading && termIndex < searchTerms.length) {
+            loadMoreShorts();
+        }
+
         const videoData = shortsList[index];
         const wrapper = document.createElement('div');
         wrapper.className = 'shorts-video-wrapper';
         
         try {
-            // watch.ejs と同じように /wkt/back/next/${id} からストリーム情報を取得
             const res = await fetch(`/wkt/back/next/${videoData.id}`);
             const data = await res.json();
             
-            // 720p 固定の選択ロジック
             let videoUrl = data.stream_url;
             let audioUrl = data.audioUrl || '';
 
             if (data.streamUrls) {
-                // 720p の MP4 を探す
                 const target = data.streamUrls.find(s => s.resolution && s.resolution.includes('720') && s.container === 'mp4') 
                              || data.streamUrls.find(s => s.resolution && s.resolution.includes('720'))
                              || data.streamUrls[0];
                 if (target) videoUrl = target.url;
             }
 
-            // watch.ejs と同じく video + audio の構成
             wrapper.innerHTML = `
                 <video id="shortsVideo" src="${videoUrl}" loop playsinline style="width:100%; height:100%;"></video>
                 <audio id="shortsAudio" src="${audioUrl}" loop></audio>
@@ -459,7 +475,6 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
             const video = wrapper.querySelector('#shortsVideo');
             const audio = wrapper.querySelector('#shortsAudio');
 
-            // 同期再生ロジック (watch.ejs 準拠)
             video.onplay = () => { if (audio.src && audio.src !== window.location.href) audio.play(); };
             video.onpause = () => { audio.pause(); };
             video.onseeking = () => { audio.currentTime = video.currentTime; };
@@ -478,6 +493,7 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
 
     document.getElementById('shortsNext').addEventListener('click', () => {
         if (currentIndex < shortsList.length - 1) playShort(currentIndex + 1);
+        else if (!isLoading) showMessage('読み込み中...');
     });
     document.getElementById('shortsPrev').addEventListener('click', () => {
         if (currentIndex > 0) playShort(currentIndex - 1);
