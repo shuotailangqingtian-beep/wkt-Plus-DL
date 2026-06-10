@@ -9,7 +9,7 @@ pinned: false
 
 # わかめtube Plusへようこそ！
 
-もう開発が終了したわかめtubeに [@toka-kun](https://github.com/toka-kun) が改良を加えているものです。大幅に強化しています。
+もう開発が終了したわかめtubeに [@toka-kun](https://github.com/toka-kun) が改良を加えているものです。大幅に強化しています。（さらにダウンロード機能追加）
 
 - わかめtubeのレポジトリは[こちら](https://github.com/wakame02/wkt)
 - わかめtube Plusのレポジトリは[こちら](https://github.com/toka-kun/wkt-Plus)
@@ -25,8 +25,9 @@ pinned: false
   - ストリーミング再生
 - トレンド情報をまた閲覧できるように改善
 - その他エラー改善
+- ダウンロード機能ついか
 - 詳しくは[更新ログ](#更新ログ)へ
-
+ショート動画追加予定
 ---
 
 # 🚀 クイックスタート
