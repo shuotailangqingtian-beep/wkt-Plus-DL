@@ -82,6 +82,91 @@
             height: 30px;
             width: auto;
         }
+        /* Shorts UI */
+        #shortsOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 9999;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #shortsOverlay.active { display: flex; }
+        .shorts-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .shorts-video-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: transform 0.3s ease-out;
+        }
+        .shorts-video-wrapper video {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+        .shorts-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        .shorts-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 10001;
+        }
+        .shorts-btn {
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .shorts-close {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 32px;
+            color: white;
+            cursor: pointer;
+            z-index: 10001;
+        }
+        #shortsLoading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-900 font-sans">
@@ -92,6 +177,13 @@
                 <img src="https://count.getloli.com/@wkt-plus?name=wkt-plus&theme=original-new&padding=7&offset=0&align=top&scale=0.4&pixelated=1&darkmode=auto">
             </a>
             <div class="space-x-6 flex items-center">
+                <!-- Shorts ボタン追加 -->
+                <button id="shortsBtn" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-full flex items-center gap-1 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                    Shorts
+                </button>
                 <button id="secretModeBtn" class="hover:text-gray-300 flex items-center transition-colors">🤫シークレット</button>
                 <button id="openSettings" class="hover:text-gray-300">⚙️再生方法</button>
                 <a href="/wkt/trend" class="hover:text-gray-300">トレンド</a>
@@ -165,6 +257,19 @@
 
     </section>
 
+    <!-- Shorts オーバーレイ UI -->
+    <div id="shortsOverlay">
+        <div class="shorts-close" id="shortsClose">×</div>
+        <div id="shortsLoading">動画を読み込み中...<br>(100本取得しています)</div>
+        <div class="shorts-container" id="shortsContainer">
+            <!-- 動画がここに動的に追加される -->
+        </div>
+        <div class="shorts-controls">
+            <div class="shorts-btn" id="shortsNext">↓</div>
+            <div class="shorts-btn" id="shortsPrev">↑</div>
+        </div>
+    </div>
+
 <div id="settingsPanel" class="fixed top-0 left-0 w-full bg-white dark:bg-gray-900 shadow-lg p-6 -translate-y-full duration-300">
     <div class="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white max-w-2xl mx-auto bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md">
       <h1 class="text-2xl font-bold mb-4">再生方法の設定</h1>
@@ -225,23 +330,155 @@ document.getElementById("searchForm").addEventListener("submit", function(event)
         showMessage(`YouTubeのURLとして処理されました☑️`);
         targetUrl = `/wkt/watch/${videoId}`;
     } else {
-        // 通常の検索遷移先を生成
         targetUrl = `/wkt/s?q=${encodeURIComponent(query)}`;
     }
 
-    // シークレットON かつ 通常のタブ（about:blankの中ではない）なら自動クローキング発動
     if (window === window.parent && localStorage.getItem('secretMode') === 'on') {
         const fullUrl = new URL(targetUrl, window.location.origin).href;
         if (typeof openUrlInAboutBlank === 'function') {
-            openUrlInAboutBlank(fullUrl, true); // 遷移先をabout:blankで開き、元タブを隠す
+            openUrlInAboutBlank(fullUrl, true);
         } else {
             window.location.href = targetUrl;
         }
     } else {
-        // 通常遷移
         window.location.href = targetUrl;
     }
 });
+
+// ==========================================
+// Shorts 機能の実装
+// ==========================================
+(function() {
+    let shortsList = [];
+    let currentIndex = 0;
+    const overlay = document.getElementById('shortsOverlay');
+    const container = document.getElementById('shortsContainer');
+    const loading = document.getElementById('shortsLoading');
+
+    document.getElementById('shortsBtn').addEventListener('click', async () => {
+        overlay.classList.add('active');
+        if (shortsList.length === 0) {
+            await loadShorts();
+        } else {
+            playShort(currentIndex);
+        }
+    });
+
+    document.getElementById('shortsClose').addEventListener('click', () => {
+        overlay.classList.remove('active');
+        const currentVideo = container.querySelector('video');
+        if (currentVideo) currentVideo.pause();
+    });
+
+    async function loadShorts() {
+        loading.style.display = 'block';
+        container.innerHTML = '';
+        
+        // 検索履歴を取得（localStorageから）
+        let history = JSON.parse(localStorage.getItem('wakametubeserhistory') || '[]');
+        let query = history.length > 0 ? history[history.length - 1] : 'Shorts';
+        
+        try {
+            // 100本取得するために複数回リクエスト
+            let videos = [];
+            const searchTerms = [query, 'Shorts', 'ショート動画', '面白動画'];
+            
+            for (let term of searchTerms) {
+                if (videos.length >= 100) break;
+                const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(term)}&type=video`);
+                const html = await res.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const items = doc.querySelectorAll('.result-item');
+                
+                items.forEach(item => {
+                    const link = item.querySelector('a');
+                    if (link) {
+                        const id = link.href.split('/').pop();
+                        const title = item.querySelector('.font-bold')?.textContent || '';
+                        const author = item.querySelector('.text-gray-400')?.textContent || '';
+                        if (!videos.find(v => v.id === id)) {
+                            videos.push({ id, title, author });
+                        }
+                    }
+                });
+            }
+            
+            shortsList = videos.slice(0, 100);
+            loading.style.display = 'none';
+            if (shortsList.length > 0) {
+                playShort(0);
+            } else {
+                loading.textContent = '動画が見つかりませんでした。';
+            }
+        } catch (e) {
+            console.error(e);
+            loading.textContent = 'エラーが発生しました。';
+        }
+    }
+
+    async function playShort(index) {
+        if (index < 0 || index >= shortsList.length) return;
+        currentIndex = index;
+        container.innerHTML = '';
+        
+        const videoData = shortsList[index];
+        const wrapper = document.createElement('div');
+        wrapper.className = 'shorts-video-wrapper';
+        
+        // ストリームURLを取得
+        try {
+            // getvideoコントローラーに相当するAPIを叩く
+            const res = await fetch(`/wkt/back/next/${videoData.id}`);
+            const data = await res.json();
+            
+            // 画質を720p付近に固定するための選択
+            let streamUrl = data.stream_url;
+            if (data.streamUrls) {
+                const target = data.streamUrls.find(s => s.resolution && s.resolution.includes('720')) || data.streamUrls[0];
+                if (target) streamUrl = target.url;
+            }
+
+            wrapper.innerHTML = `
+                <video src="${streamUrl}" loop playsinline></video>
+                <div class="shorts-info">
+                    <h3 class="font-bold text-xl">${videoData.title}</h3>
+                    <p class="text-sm opacity-80">${videoData.author}</p>
+                </div>
+            `;
+            container.appendChild(wrapper);
+            const video = wrapper.querySelector('video');
+            video.play().catch(e => {
+                video.muted = true;
+                video.play();
+                showMessage('タップして音声を再生');
+            });
+        } catch (e) {
+            console.error(e);
+            wrapper.innerHTML = '<div class="text-white">再生エラー</div>';
+            container.appendChild(wrapper);
+        }
+    }
+
+    document.getElementById('shortsNext').addEventListener('click', () => {
+        if (currentIndex < shortsList.length - 1) playShort(currentIndex + 1);
+    });
+    document.getElementById('shortsPrev').addEventListener('click', () => {
+        if (currentIndex > 0) playShort(currentIndex - 1);
+    });
+
+    // スワイプ操作の実装
+    let touchStartY = 0;
+    container.addEventListener('touchstart', e => touchStartY = e.touches[0].clientY);
+    container.addEventListener('touchend', e => {
+        const touchEndY = e.changedTouches[0].clientY;
+        const diff = touchStartY - touchEndY;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0) document.getElementById('shortsNext').click();
+            else document.getElementById('shortsPrev').click();
+        }
+    });
+})();
 
 // ==========================================
 // 初期ロード時のメッセージ等
@@ -282,35 +519,6 @@ function showMessage(text) {
         clearTimeout(autoRemoveTimer);
         hideMessage(alertMessage);
     });
-    let startX = null;
-    let currentX = 0;
-    let moved = false;
-    alertMessage.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-        moved = false;
-        alertMessage.style.transition = 'none';
-    });
-    alertMessage.addEventListener('touchmove', (e) => {
-        if (startX === null) return;
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - startX;
-        if (Math.abs(deltaX) > 5) moved = true;
-        currentX = deltaX;
-        alertMessage.style.transform = `translateX(${deltaX}px) scale(1)`;
-    });
-    alertMessage.addEventListener('touchend', () => {
-        alertMessage.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-        if (moved && Math.abs(currentX) > 100) {
-            alertMessage.style.opacity = '0';
-            alertMessage.style.transform = `translateX(${currentX > 0 ? 500 : -500}px) scale(0.95)`;
-            setTimeout(() => alertMessage.remove(), 300);
-        } else {
-            alertMessage.style.transform = 'translateX(0) scale(1)';
-        }
-        startX = null;
-        currentX = 0;
-        moved = false;
-    });
 }
 function hideMessage(elem) {
     elem.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
@@ -344,22 +552,21 @@ window.addEventListener('DOMContentLoaded', () => {
         return acc;
     }, {});
     const playbackMode = cookies.playbackMode || 'normal';
-    document.querySelector(`input[value="${playbackMode}"]`).checked = true;
+    const radio = document.querySelector(`input[name=playbackMode][value=${playbackMode}]`);
+    if (radio) radio.checked = true;
 });
 
 
 // ==========================================
-// シークレットモード（ON/OFF機能 & 自動発動）
+// シークレットモード
 // ==========================================
 
 const secretModeBtn = document.getElementById('secretModeBtn');
 
-// デフォルト状態を「オン」にする
 if (localStorage.getItem('secretMode') === null) {
     localStorage.setItem('secretMode', 'on');
 }
 
-// ボタンのテキストと色を更新する関数
 function updateSecretBtnDisplay() {
     const mode = localStorage.getItem('secretMode');
     if (mode === 'on') {
@@ -368,44 +575,35 @@ function updateSecretBtnDisplay() {
         secretModeBtn.innerHTML = '🤫シークレット <span class="text-gray-500 font-bold ml-1 text-sm">(OFF)</span>';
     }
 }
-updateSecretBtnDisplay(); // ロード時に表示を合わせる
+updateSecretBtnDisplay();
 
-// ボタンを押した時の処理（ON/OFFの切り替え）
 secretModeBtn.addEventListener('click', (e) => {
     e.preventDefault();
     const currentMode = localStorage.getItem('secretMode');
     
     if (currentMode === 'on') {
-        // オフにしようとした時の警告
         if (confirm('シークレットモードをオフにすると履歴が残ってしまいますが、よろしいですか？')) {
             localStorage.setItem('secretMode', 'off');
             updateSecretBtnDisplay();
             showMessage('シークレットモードをOFFにしました。');
         }
     } else {
-        // オンにする
         localStorage.setItem('secretMode', 'on');
         updateSecretBtnDisplay();
         showMessage('シークレットモードをONにしました。');
     }
 });
 
-// 【自動クローキングの発動】
-// 通常のタブ（about:blankではない場所）にいる場合のみ、リンクのクリックを監視する
 if (window === window.parent) {
     document.addEventListener('click', function(e) {
         const link = e.target.closest('a');
-        
-        // リンクが存在し、設定用のリンク(#)やJavaScript実行ではない場合
         if (link && link.href && !link.getAttribute('href').startsWith('#') && !link.href.startsWith('javascript:')) {
-            
-            // シークレットモードがONなら、遷移をキャンセルしてabout:blankで開き直す
             if (localStorage.getItem('secretMode') === 'on') {
                 e.preventDefault();
                 if (typeof openUrlInAboutBlank === 'function') {
-                    openUrlInAboutBlank(link.href, true); // true = 元タブをGoogleへ
+                    openUrlInAboutBlank(link.href, true);
                 } else {
-                    window.location.href = link.href; // 万が一関数が読み込めていない時の保険
+                    window.location.href = link.href;
                 }
             }
         }
