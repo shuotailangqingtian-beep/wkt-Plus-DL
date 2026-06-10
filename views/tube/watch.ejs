@@ -279,6 +279,7 @@
 <% if (videoInfo.watch_next_feed && videoInfo.watch_next_feed.length > 0) { %>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             <% videoInfo.watch_next_feed.forEach(video => { %>
+              <% if (!video || !video.type) return; %>
               <% if (video.type.endsWith("Video")) { %>
                 <div class="result-item bg-gray-800 p-4 rounded-lg shadow hover:bg-gray-700 transition duration-200">
                     <a href="/wkt/watch/<%= video.id %>" class="block relative group">
@@ -310,30 +311,36 @@
                     </div>
                 </div>
               <% } else if (video.type.endsWith("Playlist")) { %>
-                <div class="result-item bg-gray-800 p-4 rounded-lg shadow hover:bg-gray-700 transition duration-200">
-                    <a href="/wkt/watch/<%= video.id %>" class="block relative group">
-                        <img loading="lazy" src="/wkt/back/vi/<%= video.id %>/mqdefault.jpg" alt="<%= video.title?.text || '再生リスト' %>" class="w-full h-auto rounded aspect-video object-cover">
-                        <div class="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center rounded">
-                            <div class="text-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                <span class="text-sm font-bold"><%= video.video_count?.text || '再生リスト' %></span>
-                            </div>
-                        </div>
+                <div class="bg-gray-800 p-2 rounded">
+                    <a href="/wkt/p/<%= video.id %>">
+                        <img src="/wkt/back/vi/<%= video?.endpoint?.payload?.videoId || video.first_videos?.[0]?.id || 'default' %>/mqdefault.jpg" alt="<%= video.title.text %> のサムネイル" class="w-full h-24 rounded">
                     </a>
-                    <div class="mt-3">
-                        <a href="/wkt/watch/<%= video.id %>">
-                            <p class="text-white font-bold text-sm leading-snug line-clamp-2 hover:text-blue-400 transition"><%= video.title?.text || '' %></p>
-                        </a>
-                        <p class="text-gray-400 text-xs mt-1"><%= video.author?.name || '' %></p>
-                    </div>
+                    <p class="text-sm font-bold mt-1">
+                        <a href="/wkt/p/<%= video.id %>"><%= video.title.text %></a>
+                    </p>
+                    <p class="text-xs text-gray-400">動画数: <%= video.video_count?.text || '不明' %></p>
+                </div>
+              <% } else if (video.type.endsWith("Channel")) { %>
+                <div class="bg-gray-800 p-2 rounded">
+                    <a href="/wkt/c/<%= video.author.id %>">
+                        <% if (video.author?.thumbnails?.length) { %>
+                        <img src="/wkt/back/yt3<%- (new URL(video.author.thumbnails[0].url)).pathname %>" alt="<%= video.author.name %> のチャンネルアイコン" class="w-16 h-16 rounded-full mx-auto">
+                        <% } %>
+                    </a>
+                    <p class="text-sm font-bold mt-1 text-center">
+                        <a href="/wkt/c/<%= video.author.id %>"><%= video.author.name %></a>
+                    </p>
+                    <p class="text-xs text-gray-400 text-center">
+                        登録者数: <%= video.subscriber_count?.text || '非公開' %>
+                    </p>
                 </div>
               <% } %>
             <% }); %>
         </div>
 <% } else { %>
-    <p class="text-gray-400 text-center py-8">関連動画が見つかりませんでした</p>
+    <div style="height: 100vh; width: 100%;">
+        <iframe src="/wkt/back/next/<%= videoId %>" width="100%" height="100%" frameborder="0" allowfullscreen></iframe>
+    </div>
 <% } %>
             </div>
         </div>
@@ -420,7 +427,11 @@
         </div>
     </div>
 
-    <button id="expandSidebar" class="expand-sidebar-btn">サイドバーを表示</button>
+    <button id="expandSidebar" class="expand-sidebar-btn">◀ サイドバーを開く</button>
+
+    <div style="height:480px;" class="w-full max-w-3xl mx-auto mt-8 px-4">
+        <script src="//accaii.com/wktplus/widget.js" async></script>
+    </div>
 
     <div id="messageBox" class="fixed bottom-4 left-4 z-50 transform -translate-x-full transition-transform duration-300 ease-in-out bg-gray-800 text-white p-4 rounded shadow-lg border-l-4 border-blue-500 hidden">
         <p id="messageText"></p>
@@ -458,32 +469,21 @@
     $(document).ready(function() {
         // コメント取得
         const videoId = "<%= videoId %>";
-        $.get(`/wkt/back/comment/${videoId}`, function(data) {
-            $('#commentsList2').html(data);
-        }).fail(function() {
-            $('#commentsList2').html('<p class="text-red-500">コメントの取得に失敗しました</p>');
-            $('#retryButton').removeClass('hidden');
-        });
-
-        $('#retryButton').click(function() {
-            $(this).addClass('hidden');
-            $('#commentsList2').html('<p>コメントを取得中...</p>');
-            $.get(`/wkt/back/comment/${videoId}`, function(data) {
-                $('#commentsList2').html(data);
-            }).fail(function() {
+        async function fetchComments() {
+            $('#commentsList2').html("<p>コメントを取得中...</p>");
+            try {
+                const response = await fetch("/wkt/back/comment/<%= videoId %>");
+                if (!response.ok) throw new Error("サーバーエラー");
+                const responseText = await response.text();
+                $('#commentsList2').html(responseText);
+            } catch (error) {
+                console.error("エラー:", error);
                 $('#commentsList2').html('<p class="text-red-500">コメントの取得に失敗しました</p>');
                 $('#retryButton').removeClass('hidden');
-            });
-        });
-
-        // 再生設定の初期化
-        const cookies = document.cookie.split(';').reduce((res, c) => {
-            const [key, val] = c.trim().split('=');
-            res[key] = val;
-            return res;
-        }, {});
-        const mode = cookies.playbackMode || 'normal';
-        $(`#mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`).prop('checked', true);
+            }
+        }
+        $('#retryButton').click(fetchComments);
+        fetchComments();
 
         // サイドバー開閉
         $('#expandSidebar').click(function() {
@@ -492,44 +492,6 @@
             $(this).removeClass('visible');
             $('#related-sidenone').removeClass('hidden');
             localStorage.setItem("sidebarHidden", "false");
-        });
-
-        // 動画エラー時の再読み込み
-        video.addEventListener('error', function() {
-            $('#erroreloadButton').removeClass('hidden');
-        });
-        $('#erroreloadButton').click(function() {
-            const currentTime = video.currentTime;
-            video.load();
-            video.currentTime = currentTime;
-            $(this).addClass('hidden');
-            video.play();
-        });
-
-        // 同期再生
-        video.addEventListener('play', () => {
-            if (audio.src && audio.src !== window.location.href) {
-                audio.play();
-            }
-        });
-        video.addEventListener('pause', () => {
-            audio.pause();
-        });
-        video.addEventListener('seeking', () => {
-            audio.pause();
-            audio.currentTime = 0;
-        });
-        video.addEventListener('seeked', () => {
-            if (audio.src && audio.src !== window.location.href) {
-                audio.currentTime = video.currentTime;
-            }
-        });
-        video.addEventListener('timeupdate', () => {
-            if (audio.src && audio.src !== window.location.href) {
-                if (Math.abs(video.currentTime - audio.currentTime) > 0.4) {
-                    audio.currentTime = video.currentTime + 0.1;
-                }
-            }
         });
 
         // 画質変更
@@ -565,158 +527,52 @@
             video.play().catch(e => console.error(e));
         });
 
-        // 音質変更
-        $('#audioSelect').change(function() {
-            const selectedQuality = $('#qualitySelect').find(':selected');
-            const isAuto = selectedQuality.attr('data-is-auto') === 'true';
-            const currentVideoUrl = selectedQuality.val();
-            const newAudioUrl = $(this).val();
-
-            if (isAuto || currentVideoUrl.includes("manifest") || currentVideoUrl.includes(".m3u8")) {
-                return;
-            }
-
-            const currentTime = video.currentTime;
-            const wasPlaying = !video.paused;
-
-            video.pause();
-            audio.pause();
-            audio.src = newAudioUrl;
-            audio.load();
-            audio.currentTime = currentTime;
-            if (wasPlaying) {
-                video.play().catch(e => console.error(e));
-            }
-        });
-
-        // 画質リセット
-        $('#qualityReset').click(function() {
-            video.pause();
-            audio.pause();
-            const currentTime = video.currentTime;
-            videoSrc.type = "video/mp4";
-            videoSrc.src = "<%- videoData.stream_url %>";
-            audio.src = "";
-            $('#qualitySelect').prop('selectedIndex', 0);
-            video.load();
-            video.currentTime = currentTime;
-            video.play().catch(e => console.error(e));
-        });
-
-        // サーバー変更
-        $('#changeServer').click(function() {
-            const server = $('#serverSelect').val();
-            showMessage(`サーバーを「${server}」に移動します☑️`);
-            window.location.href = `/wkt/watch/<%= videoId %>?server=${server}`;
-        });
-
-        // 設定保存
-        $('#saveSettings').click(function() {
-            const mode = $('input[name="playbackMode"]:checked').val();
-            document.cookie = `playbackMode=${mode}; path=/; max-age=31536000`;
-            showMessage(`再生方法を${mode}に変更します☑️`);
-            window.location.href = `/wkt/redirect/mode/<%= videoId %>?mode=${mode}`;
-        });
-
-        // ツールバー
-        $('#toggleToolbar').click(() => $('#toolbar').addClass('open'));
-        $('#closeToolbar').click(() => $('#toolbar').removeClass('open'));
-
-        // 高画質トグル
-        $('#hdToggle').change(function() {
-            const currentTime = video.currentTime;
-            const wasPlaying = !video.paused;
-
-            if (this.checked) {
-                videoSrc.type = "video/webm";
-                videoSrc.src = "<%- videoData.highstreamUrl %>";
-                if ("<%- videoData.highstreamUrl %>".startsWith("https://manifest.googlevideo.com/")) {
-                    audio.src = "";
-                } else {
-                    audio.src = "<%- videoData.audioUrl || '' %>";
-                }
-                video.load();
-                if (audio.src && audio.src !== window.location.href) {
-                    audio.load();
-                    audio.currentTime = currentTime;
-                }
-            } else {
-                videoSrc.type = "video/mp4";
-                videoSrc.src = "<%- videoData.stream_url %>";
-                audio.pause();
-                audio.src = '';
-                video.load();
-            }
-            video.currentTime = currentTime;
-            if (wasPlaying) {
-                video.play().catch(error => console.error("動画の再生エラー:", error));
-            }
-        });
-
         // 概要欄トグル
         window.toggleDescription = function(button) {
-            const description = button.closest('div').nextElementSibling;
-            if (description.classList.contains('hidden')) {
-                description.classList.remove('hidden');
-                button.textContent = '折りたたむ';
+            const description = $(button).closest('div').next('.description');
+            if (description.is(':visible')) {
+                description.hide();
+                $(button).text('表示する');
             } else {
-                description.classList.add('hidden');
-                button.textContent = '表示する';
+                description.show();
+                $(button).text('折りたたむ');
             }
         };
 
         // お気に入り
-        const videoId = "<%= videoId %>";
-        const channelId = "<%= videoInfo.channelId %>";
-        const channelName = "<%= videoInfo.channelName %>";
-        const videoTitle = "<%= videoInfo.title %>";
-
         function getFavorites() {
             return JSON.parse(localStorage.getItem("wakametubefavorites") || "[]");
         }
-
         function checkFav() {
             const favorites = getFavorites();
-            const isFavorited = favorites.some(f => f.videoId === videoId);
+            const isFavorited = favorites.some(f => f.videoId === "<%= videoId %>");
             $('#favoriteIcon').attr('src', isFavorited ? "https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_hoshi_1.png" : "https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_hoshi_4.png");
         }
-
         $('#favoriteBtn').click(function() {
             let favorites = getFavorites();
-            const index = favorites.findIndex(f => f.videoId === videoId);
+            const index = favorites.findIndex(f => f.videoId === "<%= videoId %>");
             if (index !== -1) {
                 favorites.splice(index, 1);
-                showMessage(`${videoTitle}をお気に入りから解除しました`);
+                showMessage(`お気に入りから解除しました`);
             } else {
-                favorites.push({ videoId, channelId, channelName, videoTitle });
-                showMessage(`${videoTitle}をお気に入りに追加しました`);
+                favorites.push({ videoId: "<%= videoId %>", channelId: "<%= videoInfo.channelId %>", channelName: "<%= videoInfo.channelName %>", videoTitle: "<%= videoInfo.title %>" });
+                showMessage(`お気に入りに追加しました`);
             }
             localStorage.setItem("wakametubefavorites", JSON.stringify(favorites));
             checkFav();
         });
-
         checkFav();
-
-        // 履歴保存
-        function saveToHistory() {
-            let history = JSON.parse(localStorage.getItem("wakametubehistory") || "[]");
-            history = history.filter(h => h.videoId !== videoId);
-            history.unshift({ videoId, channelId, channelName, videoTitle });
-            if (history.length > 50) history.pop();
-            localStorage.setItem("wakametubehistory", JSON.stringify(history));
-        }
-        saveToHistory();
 
         // ダウンロード機能
         const videoData = <%- JSON.stringify(videoData) %>;
-        $('#downloadBtn').click(function() {
+        $('#downloadBtn').on('click', function() {
             $('#downloadOptions').toggleClass('hidden');
             updateDownloadQualities();
         });
-        $('#dlCancel').click(function() {
+        $('#dlCancel').on('click', function() {
             $('#downloadOptions').addClass('hidden');
         });
-        $('#dlType').change(updateDownloadQualities);
+        $('#dlType').on('change', updateDownloadQualities);
 
         function updateDownloadQualities() {
             const type = $('#dlType').val();
@@ -746,16 +602,16 @@
                 } else if (videoData.audioUrl) {
                     $select.append(`<option value="${videoData.audioUrl}">標準音声 (m4a)</option>`);
                 }
-                $select.append(`<option value="https://www.youtube.com/watch?v=${videoId}">YouTubeで開く (外部変換用)</option>`);
+                $select.append(`<option value="https://www.youtube.com/watch?v=<%= videoId %>">YouTubeで開く (外部変換用)</option>`);
             } else if (type === 'image') {
-                $select.append(`<option value="/wkt/back/vi/${videoId}/maxresdefault.jpg">最大サイズ (JPG)</option>`);
-                $select.append(`<option value="/wkt/back/vi/${videoId}/hqdefault.jpg">高画質 (JPG)</option>`);
-                $select.append(`<option value="/wkt/back/vi/${videoId}/mqdefault.jpg">中画質 (JPG)</option>`);
+                $select.append(`<option value="/wkt/back/vi/<%= videoId %>/maxresdefault.jpg">最大サイズ (JPG)</option>`);
+                $select.append(`<option value="/wkt/back/vi/<%= videoId %>/hqdefault.jpg">高画質 (JPG)</option>`);
+                $select.append(`<option value="/wkt/back/vi/<%= videoId %>/mqdefault.jpg">中画質 (JPG)</option>`);
             }
             if ($select.children().length === 0) $select.append('<option value="">利用可能な形式がありません</option>');
         }
 
-        $('#dlStart').click(function() {
+        $('#dlStart').on('click', function() {
             const url = $('#dlQuality').val();
             if (!url) return;
             if (confirm('ダウンロードを開始しますか？\n※著作権に注意し、私的利用の範囲内でご利用ください。')) {
@@ -781,24 +637,7 @@
                 document.exitFullscreen?.() || document.mozCancelFullScreen?.() || document.webkitExitFullscreen?.() || document.msExitFullscreen?.();
             }
         }
-        if (event.key === 'ArrowRight') video.currentTime += 10;
-        if (event.key === 'ArrowLeft') video.currentTime -= 10;
     });
-
-    // WakeLock
-    let wakeLock = null;
-    video.addEventListener('play', async () => {
-        try {
-            if (!wakeLock) wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) {}
-    });
-    const releaseWakeLock = () => {
-        if (wakeLock) {
-            wakeLock.release().then(() => wakeLock = null);
-        }
-    };
-    video.addEventListener('pause', releaseWakeLock);
-    video.addEventListener('ended', releaseWakeLock);
     </script>
 </body>
 </html>
