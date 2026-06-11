@@ -209,7 +209,9 @@
         recList.innerHTML = '<div class="col-span-full py-10 text-center text-gray-500">おすすめを読み込み中...</div>';
         
         try {
-            const q = selected[Math.floor(Math.random() * selected.length)];
+            const artist = selected[Math.floor(Math.random() * selected.length)];
+            // アーティスト名に "Official" を加えて検索精度を向上
+            const q = artist + " Official";
             const res = await fetch(`/wakams/s?q=${encodeURIComponent(q)}`);
             const html = await res.text();
             const parser = new DOMParser();
@@ -226,24 +228,61 @@
                 tracks.forEach((t) => {
                     if (count < 6) {
                         const id = t.dataset.id || t.dataset.trackId;
-                        const title = t.dataset.title || t.querySelector('.font-bold')?.textContent;
-                        const user = t.querySelector('.text-gray-400')?.textContent;
+                        const title = t.dataset.title || t.querySelector('.font-bold')?.textContent || "";
+                        const user = t.querySelector('.text-gray-400')?.textContent || "";
                         const img = t.querySelector('img')?.src;
 
-                        const card = document.createElement('div');
-                        card.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer group";
-                        card.innerHTML = `
-                            <img src="${img}" class="w-12 h-12 rounded-lg object-cover">
-                            <div class="flex-1 min-w-0">
-                                <p class="font-bold text-sm truncate group-hover:text-blue-400">${title}</p>
-                                <p class="text-xs text-gray-400 truncate">${user}</p>
-                            </div>
-                        `;
-                        card.onclick = () => playTrack(id, title.replace(/'/g, "\\'"));
-                        recList.appendChild(card);
-                        count++;
+                        // カバー曲、歌ってみた、リミックス、インストを除外するフィルタリング
+                        const lowerTitle = title.toLowerCase();
+                        const isCover = lowerTitle.includes('cover') || lowerTitle.includes('歌ってみた') || 
+                                      lowerTitle.includes('remix') || lowerTitle.includes('instrumental') || 
+                                      lowerTitle.includes('inst') || lowerTitle.includes('piano') ||
+                                      lowerTitle.includes('karaoke') || lowerTitle.includes('カラオケ');
+                        
+                        // アーティスト本人の名前がタイトルに含まれているか、投稿者名に含まれている場合に優先
+                        const isArtistMatch = title.includes(artist) || user.includes(artist);
+
+                        if (!isCover && isArtistMatch) {
+                            const card = document.createElement('div');
+                            card.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer group";
+                            card.innerHTML = `
+                                <img src="${img}" class="w-12 h-12 rounded-lg object-cover">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-bold text-sm truncate group-hover:text-blue-400">${title}</p>
+                                    <p class="text-xs text-gray-400 truncate">${user}</p>
+                                </div>
+                            `;
+                            card.onclick = () => playTrack(id, title.replace(/'/g, "\\'"));
+                            recList.appendChild(card);
+                            count++;
+                        }
                     }
                 });
+                
+                // もしフィルタリングの結果、1曲も表示されなかった場合のバックアップ表示
+                if (count === 0) {
+                    tracks.forEach((t) => {
+                        if (count < 3) {
+                            const id = t.dataset.id || t.dataset.trackId;
+                            const title = t.dataset.title || t.querySelector('.font-bold')?.textContent || "";
+                            const user = t.querySelector('.text-gray-400')?.textContent || "";
+                            const img = t.querySelector('img')?.src;
+                            
+                            const card = document.createElement('div');
+                            card.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer group";
+                            card.innerHTML = `
+                                <img src="${img}" class="w-12 h-12 rounded-lg object-cover">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-bold text-sm truncate group-hover:text-blue-400">${title}</p>
+                                    <p class="text-xs text-gray-400 truncate">${user}</p>
+                                </div>
+                            `;
+                            card.onclick = () => playTrack(id, title.replace(/'/g, "\\'"));
+                            recList.appendChild(card);
+                            count++;
+                        }
+                    });
+                }
             }
         } catch (e) { 
             console.error(e);
