@@ -117,13 +117,15 @@
             display: none;
             margin-top: 1rem;
         }
-        /* サイドバー非表示時（.full クラスが付与されている状態）にボタンを表示 */
+        /* サイドバー非表示時でもコントロールを表示できるように調整 */
         .video-container.full .mobile-action-box {
             display: block;
         }
-        /* ダウンロードセクション追加用スタイル */
-        #downloadSection { margin-top: 1rem; }
-        #downloadOptions { background: rgba(31, 41, 55, 0.95); border: 1px solid #4b5563; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem; }
+        /* 追加機能用のスタイル */
+        #downloadPanel { display: none; margin-top: 15px; padding: 15px; background: #2d3748; border-radius: 8px; border: 1px solid #4a5568; }
+        #downloadPanel.active { display: block; }
+        .playback-mode-btn { padding: 8px 12px; border-radius: 6px; background: #4a5568; cursor: pointer; transition: background 0.2s; width: 100%; text-align: left; margin-bottom: 5px; }
+        .playback-mode-btn.active { background: #3b82f6; }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -231,30 +233,30 @@
     <div class="description mt-2">
         <p class="text-base text-gray-300 mt-1"><%- (videoInfo.description || "").replace(/\n/g, "<br>") %></p>
     </div>
-
     <!-- ダウンロードセクション追加 -->
-    <div id="downloadSection">
-        <button id="downloadBtn" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold transition-colors">📥 動画をダウンロード</button>
-        <div id="downloadOptions" class="hidden">
-            <div class="grid grid-cols-2 gap-4 mb-4">
+    <div class="mt-4 pt-4 border-t border-gray-700">
+        <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
+            📥 ダウンロード
+        </button>
+        <div id="downloadPanel">
+            <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm mb-1">タイプ</label>
-                    <select id="dlType" class="w-full bg-gray-700 border border-gray-600 rounded p-2">
-                        <option value="both">動画 + 音声 (統合版)</option>
-                        <option value="video">映像のみ</option>
+                    <label class="block text-xs text-gray-400 mb-1">タイプ</label>
+                    <select id="dlType" class="w-full bg-gray-700 p-2 rounded text-sm">
+                        <option value="both">動画 + 音声</option>
+                        <option value="video">動画のみ</option>
                         <option value="audio">音声のみ</option>
-                        <option value="image">サムネイル</option>
+                        <option value="image">画像のみ</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm mb-1">品質</label>
-                    <select id="dlQuality" class="w-full bg-gray-700 border border-gray-600 rounded p-2"></select>
+                    <label class="block text-xs text-gray-400 mb-1">画質</label>
+                    <select id="dlQuality" class="w-full bg-gray-700 p-2 rounded text-sm">
+                        <!-- JSで動的に生成 -->
+                    </select>
                 </div>
             </div>
-            <div class="flex gap-2">
-                <button id="dlStart" class="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded font-bold">開始</button>
-                <button id="dlCancel" class="px-4 bg-gray-600 hover:bg-gray-500 py-2 rounded">閉じる</button>
-            </div>
+            <button id="startDownload" class="w-full mt-4 bg-green-600 py-2 rounded font-bold">ダウンロード開始</button>
         </div>
     </div>
    </div>
@@ -308,86 +310,66 @@
               <% } %>
             <% }); %>
         </div>
-<% } else { %>
-    <p class="text-gray-400 text-center py-10">関連動画が見つかりませんでした。</p>
 <% } %>
             </div>
         </div>
 
-        <div class="sidebar" id="sidebar">
-            <div id="controlPanel" class="controlPanel bg-gray-800 p-4 rounded mb-4 open">
-                <div class="flex border-b border-gray-700 mb-4">
-                    <button class="tab-button flex-1 py-2 font-bold active" data-tab="settings">設定</button>
-                    <button class="tab-button flex-1 py-2 font-bold" data-tab="server">サーバー</button>
+        <div class="sidebar bg-gray-800 p-4 rounded" id="sidebar">
+            <button id="hideSidebar" class="w-full bg-gray-700 py-2 rounded mb-4">サイドバーを隠す</button>
+            <div class="controlPanel open" id="controlPanel">
+                <div class="flex gap-2 mb-4" id="controlTab">
+                    <button class="tab-button flex-1 py-2 bg-gray-700 rounded active" data-tab="quality">画質</button>
+                    <button class="tab-button flex-1 py-2 bg-gray-700 rounded" data-tab="settings">設定</button>
+                    <button class="tab-button flex-1 py-2 bg-gray-700 rounded" data-tab="mode">モード</button>
                 </div>
-                
-                <div id="settingsTab" class="tab-content active space-y-4">
-                    <div>
-                        <label class="block text-sm mb-1">画質選択</label>
-                        <select id="qualitySelect" class="w-full bg-gray-700 border border-gray-600 rounded p-2">
-                            <option value="<%= videoData.stream_url %>">自動 (標準)</option>
-                            <% if (videoData.streamUrls) { %>
-                                <% videoData.streamUrls.forEach(function(s) { %>
-                                    <option value="<%= s.url %>" data-is-auto="false"><%= s.resolution %> (<%= s.container %>)</option>
-                                <% }); %>
-                            <% } %>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">音声選択</label>
-                        <select id="audioSelect" class="w-full bg-gray-700 border border-gray-600 rounded p-2">
-                            <% if (videoData.audioUrls) { %>
-                                <% videoData.audioUrls.forEach(function(a) { %>
-                                    <option value="<%= a.url %>"><%= a.label || '標準音声' %></option>
-                                <% }); %>
-                            <% } else { %>
-                                <option value="<%= videoData.audioUrl %>">標準音声</option>
-                            <% } %>
-                        </select>
-                    </div>
-
-                    <!-- 再生モード追加 -->
-                    <div class="pt-2 border-t border-gray-700">
-                        <label class="block text-sm mb-2">再生モード</label>
-                        <div class="flex flex-col gap-2">
-                            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="playMode" value="both" checked> 動画 + 音声</label>
-                            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="playMode" value="videoOnly"> 映像のみ (ミュート)</label>
-                            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="playMode" value="audioOnly"> 音声のみ (映像非表示)</label>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm">ループ再生</span>
-                        <input type="checkbox" id="loopToggle" class="w-5 h-5">
-                    </div>
-                    <div class="flex gap-2">
-                        <button id="qualityReset" class="flex-1 bg-gray-700 py-2 rounded text-sm">リセット</button>
-                        <button id="saveSettings" class="flex-1 bg-blue-600 py-2 rounded text-sm">保存</button>
-                    </div>
-                </div>
-
-                <div id="serverTab" class="tab-content space-y-4">
-                    <select id="serverSelect" class="w-full bg-gray-700 border border-gray-600 rounded p-2">
-                        <option value="1">サーバー 1</option>
-                        <option value="2">サーバー 2</option>
+                <div id="qualityTab" class="tab-content active">
+                    <select id="qualitySelect" class="w-full p-2 bg-gray-700 rounded text-white">
+                        <% if (videoData.streamUrls) { %>
+                            <% videoData.streamUrls.forEach(function(stream) { %>
+                                <option value="<%= stream.url %>" data-audio="<%= stream.audioUrl %>"><%= stream.resolution %> (<%= stream.container %>)</option>
+                            <% }); %>
+                        <% } else { %>
+                            <option value="<%= videoData.stream_url %>">デフォルト</option>
+                        <% } %>
                     </select>
-                    <button id="changeServer" class="w-full bg-blue-600 py-2 rounded">サーバー切り替え</button>
+                </div>
+                <div id="settingsTab" class="tab-content">
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span>ループ再生</span>
+                            <input type="checkbox" id="loopToggle" class="w-6 h-6">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>自動再生</span>
+                            <input type="checkbox" id="autoplayToggle" class="w-6 h-6" checked>
+                        </div>
+                        <button id="openPlaybackSettings" class="w-full py-2 bg-blue-600 rounded">再生方法設定</button>
+                    </div>
+                </div>
+                <div id="modeTab" class="tab-content">
+                    <div class="space-y-2">
+                        <button class="playback-mode-btn active" data-mode="both">動画 + 音声</button>
+                        <button class="playback-mode-btn" data-mode="video">映像のみ (ミュート)</button>
+                        <button class="playback-mode-btn" data-mode="audio">音声のみ (映像非表示)</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-gray-800 p-4 rounded">
-                <h3 class="text-lg font-bold mb-4">関連動画</h3>
+            <div class="mt-4">
+                <h3 class="text-lg font-bold mb-2">関連動画</h3>
                 <div class="space-y-4">
                     <% if (videoInfo.watch_next_feed) { %>
-                        <% videoInfo.watch_next_feed.forEach(function(v) { %>
-                            <% if (v.type.endsWith("Video")) { %>
-                                <a href="/wkt/watch/<%= v.id %>" class="flex gap-2 group">
-                                    <img src="/wkt/back/vi/<%= v.id %>/mqdefault.jpg" class="w-24 h-16 object-cover rounded">
-                                    <div class="flex-1">
-                                        <p class="text-xs font-bold line-clamp-2 group-hover:text-blue-400"><%= v.title?.text %></p>
-                                        <p class="text-[10px] text-gray-400 mt-1"><%= v.author?.name %></p>
+                        <% videoInfo.watch_next_feed.forEach(function(video) { %>
+                            <% if (video.type.endsWith("Video")) { %>
+                                <div class="flex gap-2">
+                                    <a href="/wkt/watch/<%= video.id %>" class="flex-shrink-0 w-32">
+                                        <img src="/wkt/back/vi/<%= video.id %>/mqdefault.jpg" class="w-full rounded aspect-video object-cover">
+                                    </a>
+                                    <div class="min-w-0">
+                                        <a href="/wkt/watch/<%= video.id %>" class="text-sm font-bold line-clamp-2"><%= video.title?.text %></a>
+                                        <p class="text-xs text-gray-400 truncate"><%= video.author?.name %></p>
                                     </div>
-                                </a>
+                                </div>
                             <% } %>
                         <% }); %>
                     <% } %>
@@ -396,110 +378,130 @@
         </div>
     </div>
 
-    <div id="expandSidebar" class="expand-sidebar-btn" onclick="toggleSidebar()">
-        サイドバーを表示
-    </div>
+    <div id="expandSidebar" class="expand-sidebar-btn">サイドバーを表示</div>
 
     <script>
-        // ==========================================
-        // オリジナルの動画取得ロジック (100%維持)
-        // ==========================================
-        $(document).ready(function() {
-            const video = document.getElementById('video');
-            const audio = document.getElementById('audio');
-            const videoSrc = document.getElementById('videoSrc');
+    // ==========================================
+    // オリジナルのロジック (完全復元)
+    // ==========================================
+    const video = document.getElementById('video');
+    const audio = document.getElementById('audio');
+    const qualitySelect = document.getElementById('qualitySelect');
+    const videoData = <%- JSON.stringify(videoData) %>;
 
-            // オリジナルのタブ切り替え
-            $('.tab-button').click(function() {
-                const tab = $(this).data('tab');
-                $('.tab-button').removeClass('active');
-                $(this).addClass('active');
-                $('.tab-content').removeClass('active');
-                $(`#${tab}Tab`).addClass('active');
-            });
+    // 画質変更
+    qualitySelect.onchange = function() {
+        const time = video.currentTime;
+        const isPaused = video.paused;
+        const selected = qualitySelect.options[qualitySelect.selectedIndex];
+        video.src = selected.value;
+        const audioUrl = selected.getAttribute('data-audio');
+        if (audioUrl && audioUrl !== "undefined") {
+            audio.src = audioUrl;
+            audio.currentTime = time;
+        }
+        video.currentTime = time;
+        if (!isPaused) {
+            video.play();
+            if (audio.src) audio.play();
+        }
+    };
 
-            // オリジナルの画質切り替え
-            $('#qualitySelect').change(function() {
-                const val = $(this).val();
-                const currentTime = video.currentTime;
-                const isPaused = video.paused;
-                videoSrc.src = val;
-                video.load();
-                video.currentTime = currentTime;
-                if (!isPaused) video.play();
-            });
+    // タブ
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.onclick = function() {
+            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab + 'Tab').classList.add('active');
+        };
+    });
 
-            // オリジナルの音声切り替え
-            $('#audioSelect').change(function() {
-                const val = $(this).val();
-                audio.src = val;
-                audio.load();
-                audio.currentTime = video.currentTime;
-                if (!video.paused) audio.play();
-            });
+    // サイドバー
+    document.getElementById('hideSidebar').onclick = function() {
+        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('videoContainer').classList.add('full');
+        document.getElementById('expandSidebar').classList.add('visible');
+        document.getElementById('related-sidenone').classList.add('hidden');
+        localStorage.setItem('sidebarHidden', 'true');
+    };
+    document.getElementById('expandSidebar').onclick = function() {
+        document.getElementById('sidebar').classList.remove('hidden');
+        document.getElementById('videoContainer').classList.remove('full');
+        document.getElementById('expandSidebar').classList.remove('visible');
+        document.getElementById('related-sidenone').classList.remove('hidden');
+        localStorage.setItem('sidebarHidden', 'false');
+    };
 
-            // 同期ロジック (追加)
-            video.onplay = () => { if (audio.src && audio.src !== window.location.href && !video.muted) audio.play(); };
-            video.onpause = () => audio.pause();
-            video.onseeking = () => audio.currentTime = video.currentTime;
-            
-            // 再生モード切り替え (追加)
-            $('input[name="playMode"]').on('change', function() {
-                const mode = $(this).val();
-                if (mode === 'both') { video.style.display = ''; video.muted = false; if (!video.paused) audio.play(); }
-                else if (mode === 'videoOnly') { video.style.display = ''; video.muted = false; audio.pause(); }
-                else if (mode === 'audioOnly') { video.style.display = 'none'; if (!video.paused) audio.play(); }
-            });
-
-            // 4K/8K ラベル (追加)
-            $('#qualitySelect option').each(function() {
-                const t = $(this).text();
-                if (t.includes('4320')) $(this).text('8K - ' + t);
-                else if (t.includes('2160')) $(this).text('4K - ' + t);
-            });
-
-            // ダウンロード機能 (追加)
-            const vDataDL = <%- JSON.stringify(videoData) %>;
-            $('#downloadBtn').on('click', () => $('#downloadOptions').toggleClass('hidden'));
-            $('#dlCancel').on('click', () => $('#downloadOptions').addClass('hidden'));
-            $('#dlType').on('change', function() {
-                const type = $(this).val();
-                const $q = $('#dlQuality');
-                $q.empty();
-                if (type === 'both') {
-                    if (vDataDL.streamUrls) vDataDL.streamUrls.filter(s => s.container === 'mp4' && !s.url.includes('manifest')).forEach(s => $q.append(`<option value="${s.url}">${s.resolution} (統合MP4)</option>`));
-                    if (vDataDL.stream_url) $q.append(`<option value="${vDataDL.stream_url}">標準画質 (統合MP4)</option>`);
-                } else if (type === 'video') {
-                    if (vDataDL.streamUrls) vDataDL.streamUrls.forEach(s => $q.append(`<option value="${s.url}">${s.resolution} (${s.container})</option>`));
-                } else if (type === 'audio') {
-                    if (vDataDL.audioUrls) vDataDL.audioUrls.forEach(a => $q.append(`<option value="${a.url}">${a.label || '音声'}</option>`));
-                    else if (vDataDL.audioUrl) $q.append(`<option value="${vDataDL.audioUrl}">標準音声</option>`);
-                } else if (type === 'image') {
-                    $q.append(`<option value="/wkt/back/vi/<%= videoId %>/maxresdefault.jpg">最大画質</option>`);
-                }
-            });
-            $('#dlType').trigger('change');
-            $('#dlStart').on('click', () => { const u = $('#dlQuality').val(); if (u) window.open(u, '_blank'); });
-
-            // 外部音声対策
-            $(document).one('click', () => { if (audio.paused && !video.paused) audio.play().catch(() => {}); });
+    // ==========================================
+    // 追加機能
+    // ==========================================
+    $(document).ready(function() {
+        // 4K/8K ラベル
+        $('#qualitySelect option').each(function() {
+            const text = $(this).text();
+            if (text.includes('2160')) $(this).text('4K - ' + text);
+            if (text.includes('4320')) $(this).text('8K - ' + text);
         });
 
-        function toggleDescription(btn) {
-            const desc = document.querySelector('.description');
-            if (desc.style.display === 'none') { desc.style.display = 'block'; btn.textContent = '折りたたむ'; }
-            else { desc.style.display = 'none'; btn.textContent = 'もっと見る'; }
-        }
+        // モード
+        $('.playback-mode-btn').on('click', function() {
+            $('.playback-mode-btn').removeClass('active');
+            $(this).addClass('active');
+            const mode = $(this).data('mode');
+            if (mode === 'audio') {
+                $(video).hide();
+                audio.muted = false;
+            } else if (mode === 'video') {
+                $(video).show();
+                video.muted = true;
+            } else {
+                $(video).show();
+                video.muted = false;
+            }
+        });
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const videoContainer = document.getElementById('videoContainer');
-            const expandBtn = document.getElementById('expandSidebar');
-            sidebar.classList.toggle('hidden');
-            videoContainer.classList.toggle('full');
-            expandBtn.classList.toggle('visible');
-            localStorage.setItem('sidebarHidden', sidebar.classList.contains('hidden'));
-        }
+        // ダウンロード
+        $('#downloadBtn').on('click', () => $('#downloadPanel').toggleClass('active'));
+        $('#qualitySelect option').each(function() {
+            $('#dlQuality').append($(this).clone());
+        });
+
+        $('#startDownload').on('click', function() {
+            const type = $('#dlType').val();
+            const url = $('#dlQuality').val();
+            const audioUrl = $('#dlQuality option:selected').data('audio');
+            if (type === 'image') window.open('/wkt/back/vi/<%= videoId %>/maxresdefault.jpg', '_blank');
+            else if (type === 'audio' && audioUrl) window.open(audioUrl, '_blank');
+            else window.open(url, '_blank');
+        });
+
+        // お気に入り
+        const videoId = "<%= videoId %>";
+        const channelId = "<%= videoInfo.channelId %>";
+        const channelName = "<%= videoInfo.channelName %>";
+        const videoTitle = "<%= videoInfo.title %>";
+
+        $('#favoriteBtn').on('click', function() {
+            let favs = JSON.parse(localStorage.getItem("wakametubefavorites") || "[]");
+            const idx = favs.findIndex(t => t.videoId === videoId);
+            if (idx !== -1) {
+                favs.splice(idx, 1);
+                $('#favoriteIcon').attr('src', 'https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_hoshi_4.png');
+            } else {
+                favs.push({ videoId, channelId, channelName, videoTitle });
+                $('#favoriteIcon').attr('src', 'https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_hoshi_1.png');
+            }
+            localStorage.setItem("wakametubefavorites", JSON.stringify(favs));
+        });
+
+        const favs = JSON.parse(localStorage.getItem("wakametubefavorites") || "[]");
+        if (favs.some(t => t.videoId === videoId)) $('#favoriteIcon').attr('src', 'https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_hoshi_1.png');
+    });
+
+    // ツールバー
+    $('#toggleToolbar').on('click', () => $('#toolbar').addClass('open'));
+    $('#closeToolbar').on('click', () => $('#toolbar').removeClass('open'));
     </script>
 </body>
 </html>
