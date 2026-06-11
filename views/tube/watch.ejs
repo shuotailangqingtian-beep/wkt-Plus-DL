@@ -117,11 +117,9 @@
             display: none;
             margin-top: 1rem;
         }
-        /* サイドバー非表示時でもコントロールを表示できるように調整 */
         .video-container.full .mobile-action-box {
             display: block;
         }
-        /* 追加機能用のスタイル */
         #downloadPanel { display: none; margin-top: 15px; padding: 15px; background: #2d3748; border-radius: 8px; border: 1px solid #4a5568; }
         #downloadPanel.active { display: block; }
         .playback-mode-btn { padding: 8px 12px; border-radius: 6px; background: #4a5568; cursor: pointer; transition: background 0.2s; width: 100%; text-align: left; margin-bottom: 5px; }
@@ -233,7 +231,6 @@
     <div class="description mt-2">
         <p class="text-base text-gray-300 mt-1"><%- (videoInfo.description || "").replace(/\n/g, "<br>") %></p>
     </div>
-    <!-- ダウンロードセクション追加 -->
     <div class="mt-4 pt-4 border-t border-gray-700">
         <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
             📥 ダウンロード
@@ -252,7 +249,6 @@
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">画質</label>
                     <select id="dlQuality" class="w-full bg-gray-700 p-2 rounded text-sm">
-                        <!-- JSで動的に生成 -->
                     </select>
                 </div>
             </div>
@@ -326,7 +322,7 @@
                     <select id="qualitySelect" class="w-full p-2 bg-gray-700 rounded text-white">
                         <% if (videoData.streamUrls) { %>
                             <% videoData.streamUrls.forEach(function(stream) { %>
-                                <option value="<%= stream.url %>" data-audio="<%= stream.audioUrl %>"><%= stream.resolution %> (<%= stream.container %>)</option>
+                                <option value="<%= stream.url %>" data-audio="<%= stream.audioUrl %>" data-container="<%= stream.container %>"><%= stream.resolution %> (<%= stream.container %>)</option>
                             <% }); %>
                         <% } else { %>
                             <option value="<%= videoData.stream_url %>">デフォルト</option>
@@ -382,28 +378,74 @@
 
     <script>
     // ==========================================
-    // オリジナルのロジック (完全復元)
+    // オリジナルの再生同期ロジック (強化版)
     // ==========================================
     const video = document.getElementById('video');
     const audio = document.getElementById('audio');
-    const qualitySelect = document.getElementById('qualitySelect');
-    const videoData = <%- JSON.stringify(videoData) %>;
+    const videoSrc = document.getElementById('videoSrc');
 
-    // 画質変更
+    function syncAudioPlay() {
+        if (audio.src && audio.src !== window.location.href) {
+            audio.play().catch(e => {
+                console.log("オーディオ再生エラー:", e);
+                // ユーザーインタラクションが必要な場合、一度クリックで再生させる
+                $(document).one('click', () => audio.play());
+            });
+        }
+    }
+
+    video.addEventListener('play', syncAudioPlay);
+    video.addEventListener('playing', syncAudioPlay);
+    video.addEventListener('pause', () => {
+        audio.pause();
+        if(audio.src) audio.currentTime = video.currentTime;
+    });
+    video.addEventListener('ended', () => {
+        audio.pause();
+        audio.currentTime = 0;
+    });
+    video.addEventListener('seeked', () => {
+        if (audio.src && audio.src !== window.location.href) {
+            audio.currentTime = video.currentTime;
+        }
+    });
+    video.addEventListener('timeupdate', () => {
+        if (audio.src && audio.src !== window.location.href) {
+            // ズレが0.3秒以上あれば補正
+            if (Math.abs(video.currentTime - audio.currentTime) > 0.3) {
+                audio.currentTime = video.currentTime;
+            }
+        }
+    });
+
+    // 画質変更ロジック (オリジナル準拠)
+    const qualitySelect = document.getElementById('qualitySelect');
     qualitySelect.onchange = function() {
         const time = video.currentTime;
         const isPaused = video.paused;
         const selected = qualitySelect.options[qualitySelect.selectedIndex];
-        video.src = selected.value;
+        const container = selected.getAttribute('data-container') || 'mp4';
+        
+        video.pause();
+        audio.pause();
+
+        videoSrc.src = selected.value;
+        videoSrc.type = "video/" + container;
+        
         const audioUrl = selected.getAttribute('data-audio');
         if (audioUrl && audioUrl !== "undefined") {
             audio.src = audioUrl;
+            audio.load();
             audio.currentTime = time;
+        } else {
+            audio.src = "";
         }
+
+        video.load();
         video.currentTime = time;
+        
         if (!isPaused) {
-            video.play();
-            if (audio.src) audio.play();
+            video.play().then(syncAudioPlay).catch(e => console.error(e));
         }
     };
 
@@ -450,14 +492,17 @@
             $(this).addClass('active');
             const mode = $(this).data('mode');
             if (mode === 'audio') {
-                $(video).hide();
+                $(video).css('opacity', '0');
+                video.muted = false;
                 audio.muted = false;
             } else if (mode === 'video') {
-                $(video).show();
+                $(video).css('opacity', '1');
                 video.muted = true;
+                audio.muted = true;
             } else {
-                $(video).show();
+                $(video).css('opacity', '1');
                 video.muted = false;
+                audio.muted = false;
             }
         });
 

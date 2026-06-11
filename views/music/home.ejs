@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>わかめ🎶 - <%= query %></title>
     <script src="/js/tailwindcss.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <style>
         #artistSelector { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.98); z-index: 10000; padding: 40px 20px; overflow-y: auto; }
         #artistSelector.active { display: block; }
@@ -12,61 +13,90 @@
         .artist-item { background: #1f2937; border-radius: 12px; padding: 15px; text-align: center; cursor: pointer; transition: transform 0.2s; border: 2px solid transparent; }
         .artist-item.selected { border-color: #3b82f6; background: #374151; }
         .artist-item img { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 10px; object-fit: cover; }
+        .track-card:hover { background: #374151; }
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="bg-gray-900 text-white pb-32">
 
 <div id="artistSelector">
     <div class="max-w-2xl mx-auto text-center">
         <h1 class="text-3xl font-bold mb-4">好きなアーティストを選んでください</h1>
-        <div class="mb-6"><input type="text" id="artistSearchInput" placeholder="アーティストを検索..." class="p-3 rounded-full bg-gray-800 text-white w-full max-w-md border-none outline-none"></div>
+        <p class="text-gray-400 mb-8">選んだアーティストに基づいたおすすめが表示されます</p>
+        <div class="mb-6"><input type="text" id="artistSearchInput" placeholder="アーティストを検索..." class="p-4 rounded-full bg-gray-800 text-white w-full max-w-md border border-gray-700 outline-none focus:border-blue-500"></div>
         <div class="artist-grid" id="artistGrid"></div>
         <div class="flex justify-center gap-4 mt-8">
-            <button id="finishSelection" class="px-10 py-3 bg-blue-600 rounded-full font-bold">開始する</button>
-            <button id="resetSelection" class="px-6 py-3 bg-gray-700 rounded-full font-bold">リセット</button>
+            <button id="finishSelection" class="px-12 py-4 bg-blue-600 hover:bg-blue-700 rounded-full font-bold transition">開始する</button>
+            <button id="resetSelection" class="px-8 py-4 bg-gray-700 hover:bg-gray-600 rounded-full font-bold transition">リセット</button>
         </div>
     </div>
 </div>
 
-<header class="p-4 bg-gray-800 flex items-center gap-4 shadow-lg">
-    <a href="/wkt" class="p-2 bg-gray-700 rounded">🏠</a>
+<header class="p-4 bg-gray-800 flex items-center gap-4 sticky top-0 z-40 shadow-xl">
+    <a href="/wkt" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition">🏠</a>
     <form action="/wakams/s" method="get" class="flex-1 flex gap-2" id="musicSearchForm">
-        <input type="text" name="q" id="musicSearchInput" placeholder="曲を探す" required value="<%= query %>" class="flex-1 p-2 rounded bg-gray-700">
-        <button type="submit" class="p-2 bg-blue-600 rounded">🔍</button>
+        <input type="text" name="q" id="musicSearchInput" placeholder="曲、アーティスト、アルバムを検索" required value="<%= query %>" class="flex-1 p-3 rounded-full bg-gray-700 border border-transparent focus:border-blue-500 outline-none px-6">
+        <button type="submit" class="p-3 bg-blue-600 hover:bg-blue-700 rounded-full transition">🔍</button>
     </form>
-    <button id="reselectArtists" class="p-2 bg-gray-700 rounded">👤</button>
+    <button id="reselectArtists" class="p-3 bg-gray-700 hover:bg-gray-600 rounded-full transition" title="アーティストを再選択">👤</button>
 </header>
 
-<main class="p-4 max-w-2xl mx-auto">
-    <div id="recommendationSection" class="mb-8 hidden">
-        <h2 class="text-xl font-bold mb-4">✨ あなたへのおすすめ</h2>
-        <div id="recommendationList" class="grid gap-4"></div>
+<main class="p-4 max-w-3xl mx-auto">
+    <!-- おすすめセクション -->
+    <div id="recommendationSection" class="mb-12 hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-bold">✨ あなたへのおすすめ</h2>
+            <button id="refreshRecs" class="text-sm text-blue-400 hover:text-blue-300">更新</button>
+        </div>
+        <div id="recommendationList" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
     </div>
 
-    <div id="trackList" class="grid gap-4">
-        <% if (tracks && tracks.length > 0) { %>
-            <% tracks.forEach(track => { %>
-                <div class="flex items-center gap-4 p-4 bg-gray-800 rounded-lg track-item" data-id="<%= track.id %>" data-title="<%= track.title %>">
-                    <img src="<%= track.artwork_url %>" class="w-16 h-16 rounded">
-                    <div class="flex-1">
-                        <p class="font-bold"><%= track.title %></p>
-                        <p class="text-sm text-gray-400"><%= track.username %></p>
+    <!-- 検索結果 / デフォルト表示 -->
+    <div id="mainContent">
+        <h2 class="text-2xl font-bold mb-6"><%= query ? '「' + query + '」の検索結果' : '注目の楽曲' %></h2>
+        <div id="trackList" class="grid gap-3">
+            <% if (tracks && tracks.length > 0) { %>
+                <% tracks.forEach(track => { %>
+                    <div class="flex items-center gap-4 p-3 bg-gray-800 rounded-xl track-card transition cursor-pointer" data-id="<%= track.id %>" data-title="<%= track.title %>">
+                        <div class="relative group">
+                            <img src="<%= track.artwork_url %>" class="w-16 h-16 rounded-lg object-cover shadow-md">
+                            <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition rounded-lg">
+                                <span class="text-white text-xl">▶</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold truncate"><%= track.title %></p>
+                            <p class="text-sm text-gray-400 truncate"><%= track.username %></p>
+                        </div>
+                        <button class="play-btn p-3 text-blue-400 hover:text-blue-300 transition" data-track-id="<%= track.id %>">▶</button>
                     </div>
-                    <button class="play-btn p-3 bg-blue-600 rounded-lg" data-track-id="<%= track.id %>">▶</button>
+                <% }) %>
+            <% } else if (query) { %>
+                <div class="text-center py-20">
+                    <p class="text-gray-400 text-lg mb-4">楽曲が見つかりませんでした。</p>
+                    <a href="/wakams" class="text-blue-500 hover:underline">トップに戻る</a>
                 </div>
-            <% }) %>
-        <% } else if (query) { %>
-            <p class="text-center text-gray-400 py-10">楽曲が見つかりませんでした。</p>
-        <% } %>
+            <% } %>
+        </div>
     </div>
 </main>
 
-<div id="player-container" class="fixed bottom-0 left-0 w-full bg-gray-800 p-4 hidden shadow-lg z-50">
-    <div class="flex justify-between items-center mb-2">
-        <span id="nowPlayingTitle" class="text-sm truncate">再生中...</span>
-        <button id="closePlayer">✕</button>
+<!-- 固定プレイヤー -->
+<div id="player-container" class="fixed bottom-0 left-0 w-full bg-gray-800 bg-opacity-95 backdrop-blur-md p-4 hidden shadow-2xl z-50 border-t border-gray-700">
+    <div class="max-w-3xl mx-auto">
+        <div class="flex justify-between items-center mb-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 bg-blue-600 rounded flex items-center justify-center text-white">🎵</div>
+                <div class="min-w-0">
+                    <p id="nowPlayingTitle" class="text-sm font-bold truncate">再生中...</p>
+                    <p class="text-xs text-gray-400">SoundCloud</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button id="closePlayer" class="text-gray-400 hover:text-white text-xl p-1">✕</button>
+            </div>
+        </div>
+        <iframe id="player" class="w-full h-[120px] rounded-lg shadow-inner" frameborder="no" allow="autoplay"></iframe>
     </div>
-    <iframe id="player" class="w-full h-[120px]" frameborder="no" allow="autoplay"></iframe>
 </div>
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
@@ -76,14 +106,20 @@
         { name: '米津玄師', img: 'https://reissuerecords.net/common/img/profile_photo.jpg' },
         { name: 'Ado', img: 'https://www.universal-music.co.jp/ado/wp-content/uploads/sites/4243/2022/01/ado_profile.jpg' },
         { name: 'Vaundy', img: 'https://vaundy.jp/img/profile.jpg' },
-        { name: 'Official髭男dism', img: 'https://higedan.com/img/profile.jpg' }
+        { name: 'Official髭男dism', img: 'https://higedan.com/img/profile.jpg' },
+        { name: 'Eve', img: 'https://eveofficial.com/assets/img/profile/profile.jpg' },
+        { name: 'Mrs. GREEN APPLE', img: 'https://mrsgreenapple.com/img/profile.jpg' },
+        { name: 'King Gnu', img: 'https://kinggnu.jp/img/profile.jpg' }
     ];
     let selectedArtists = new Set();
 
     window.onload = () => {
         const saved = localStorage.getItem('music_artists_selected');
         if (!saved) showSelector();
-        else { selectedArtists = new Set(JSON.parse(saved)); loadRecs(); }
+        else { 
+            selectedArtists = new Set(JSON.parse(saved)); 
+            loadRecs(); 
+        }
     };
 
     function showSelector() {
@@ -97,7 +133,7 @@
         list.forEach(a => {
             const div = document.createElement('div');
             div.className = 'artist-item' + (selectedArtists.has(a.name) ? ' selected' : '');
-            div.innerHTML = `<img src="${a.img}" onerror="this.src='https://wsrv.nl/?url=https://icooon-mono.com/i/icon_10173/icon_101730_256.png'"><p>${a.name}</p>`;
+            div.innerHTML = `<img src="${a.img}" onerror="this.src='https://wsrv.nl/?url=https://icooon-mono.com/i/icon_10173/icon_101730_256.png'"><p class="font-bold text-sm">${a.name}</p>`;
             div.onclick = () => {
                 if (selectedArtists.has(a.name)) selectedArtists.delete(a.name);
                 else selectedArtists.add(a.name);
@@ -117,6 +153,10 @@
     };
 
     document.getElementById('finishSelection').onclick = () => {
+        if (selectedArtists.size === 0) {
+            alert('アーティストを少なくとも1つ選んでください。');
+            return;
+        }
         localStorage.setItem('music_artists_selected', JSON.stringify(Array.from(selectedArtists)));
         document.getElementById('artistSelector').classList.remove('active');
         loadRecs();
@@ -133,32 +173,43 @@
         const recSection = document.getElementById('recommendationSection');
         const recList = document.getElementById('recommendationList');
         recSection.classList.remove('hidden');
-        recList.innerHTML = '<p class="text-center text-gray-500">おすすめを読み込み中...</p>';
+        recList.innerHTML = '<div class="col-span-full py-10 text-center text-gray-500">おすすめを読み込み中...</div>';
         
         try {
+            // ランダムに選んだアーティストで検索
             const q = selected[Math.floor(Math.random() * selected.length)];
             const res = await fetch(`/wakams/s?q=${encodeURIComponent(q)}`);
             const html = await res.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const tracks = doc.querySelectorAll('.track-item');
+            const tracks = doc.querySelectorAll('.track-item, .track-card');
+            
             recList.innerHTML = '';
             if (tracks.length === 0) {
-                recList.innerHTML = '<p class="text-center text-gray-500">おすすめが見つかりませんでした。</p>';
+                recList.innerHTML = '<div class="col-span-full text-center text-gray-500">おすすめが見つかりませんでした。</div>';
             } else {
-                tracks.forEach((t, i) => {
-                    if (i < 5) {
+                let count = 0;
+                tracks.forEach((t) => {
+                    if (count < 6) {
                         const clone = t.cloneNode(true);
+                        clone.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer";
                         recList.appendChild(clone);
+                        count++;
                     }
                 });
-                recList.querySelectorAll('.play-btn').forEach(btn => {
-                    btn.onclick = function() { playTrack(this.dataset.trackId, this.closest('.track-item').dataset.title); };
+                // 再生ボタンにイベントを再設定
+                recList.querySelectorAll('.play-btn, .track-card, .track-item').forEach(el => {
+                    el.onclick = function(e) {
+                        e.stopPropagation();
+                        const trackId = this.dataset.trackId || this.closest('[data-id]').dataset.id;
+                        const title = this.closest('[data-title]').dataset.title;
+                        playTrack(trackId, title);
+                    };
                 });
             }
         } catch (e) { 
             console.error(e);
-            recList.innerHTML = '<p class="text-center text-red-500">エラーが発生しました。</p>';
+            recList.innerHTML = '<div class="col-span-full text-center text-red-500">おすすめの取得に失敗しました。</div>';
         }
     }
 
@@ -167,11 +218,26 @@
         container.classList.remove('hidden');
         document.getElementById('nowPlayingTitle').textContent = title;
         document.getElementById('player').src = `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${id}&auto_play=true&color=%233b82f6&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+        
+        // オートプレイ（連続再生）の設定
+        const widget = SC.Widget(document.getElementById('player'));
+        widget.bind(SC.Widget.Events.FINISH, function() {
+            // 次の曲を再生するロジック（簡易的におすすめを再読み込みして再生など）
+            console.log('再生終了');
+        });
     }
 
-    document.querySelectorAll('.play-btn').forEach(btn => {
-        btn.onclick = function() { playTrack(this.dataset.trackId, this.closest('.track-item').dataset.title); };
+    // イベント委譲で再生ボタンを処理
+    document.addEventListener('click', function(e) {
+        const trackCard = e.target.closest('.track-card, .track-item');
+        if (trackCard) {
+            const id = trackCard.dataset.id || trackCard.dataset.trackId;
+            const title = trackCard.dataset.title;
+            if (id && title) playTrack(id, title);
+        }
     });
+
+    document.getElementById('refreshRecs').onclick = loadRecs;
     document.getElementById('closePlayer').onclick = () => document.getElementById('player-container').classList.add('hidden');
     document.getElementById('reselectArtists').onclick = showSelector;
 </script>
