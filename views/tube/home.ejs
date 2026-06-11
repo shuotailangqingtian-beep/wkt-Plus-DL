@@ -129,13 +129,20 @@ document.getElementById("searchForm").addEventListener("submit", function(e) {
             const q = h.length > 0 ? h[h.length - 1] : 'Shorts';
             const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(q)}&type=video`);
             const html = await res.text();
-            const ids = html.match(/\/wkt\/watch\/([a-zA-Z0-9_-]{11})/g);
-            if (ids) {
-                ids.forEach(idPath => {
-                    const id = idPath.split('/').pop();
-                    if (!shorts.find(v => v.id === id)) shorts.push({ id });
-                });
-                if (current === 0) play(0);
+            
+            // 動画ID抽出ロジックを強化
+            const idSet = new Set();
+            const regex = /\/wkt\/watch\/([a-zA-Z0-9_-]{11})/g;
+            let match;
+            while ((match = regex.exec(html)) !== null) {
+                idSet.add(match[1]);
+            }
+            
+            if (idSet.size > 0) {
+                const newIds = Array.from(idSet).filter(id => !shorts.find(v => v.id === id));
+                // 5本ずつ追加するように調整
+                newIds.slice(0, 5).forEach(id => shorts.push({ id }));
+                if (current === 0 && shorts.length > 0) play(0);
             }
         } catch (e) { console.error(e); } finally { loading = false; }
     }
@@ -143,7 +150,7 @@ document.getElementById("searchForm").addEventListener("submit", function(e) {
     async function play(idx) {
         if (idx < 0 || idx >= shorts.length) return; current = idx;
         container.innerHTML = '<div class="text-white text-center mt-20">読み込み中...</div>';
-        if (idx >= shorts.length - 3) loadMore();
+        if (idx >= shorts.length - 2) loadMore();
         try {
             const res = await fetch(`/wkt/back/next/${shorts[idx].id}`);
             const data = await res.json();

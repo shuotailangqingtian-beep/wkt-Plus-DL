@@ -30,8 +30,8 @@
 
 <header class="p-4 bg-gray-800 flex items-center gap-4 shadow-lg">
     <a href="/wkt" class="p-2 bg-gray-700 rounded">🏠</a>
-    <form action="/wakams/s" method="get" class="flex-1 flex gap-2">
-        <input type="text" name="q" placeholder="曲を探す" required value="<%= query %>" class="flex-1 p-2 rounded bg-gray-700">
+    <form action="/wakams/s" method="get" class="flex-1 flex gap-2" id="musicSearchForm">
+        <input type="text" name="q" id="musicSearchInput" placeholder="曲を探す" required value="<%= query %>" class="flex-1 p-2 rounded bg-gray-700">
         <button type="submit" class="p-2 bg-blue-600 rounded">🔍</button>
     </form>
     <button id="reselectArtists" class="p-2 bg-gray-700 rounded">👤</button>
@@ -55,6 +55,8 @@
                     <button class="play-btn p-3 bg-blue-600 rounded-lg" data-track-id="<%= track.id %>">▶</button>
                 </div>
             <% }) %>
+        <% } else if (query) { %>
+            <p class="text-center text-gray-400 py-10">楽曲が見つかりませんでした。</p>
         <% } %>
     </div>
 </main>
@@ -72,7 +74,9 @@
     const defaultArtists = [
         { name: 'YOASOBI', img: 'https://www.yoasobi-music.jp/img/profile.jpg' },
         { name: '米津玄師', img: 'https://reissuerecords.net/common/img/profile_photo.jpg' },
-        { name: 'Ado', img: 'https://www.universal-music.co.jp/ado/wp-content/uploads/sites/4243/2022/01/ado_profile.jpg' }
+        { name: 'Ado', img: 'https://www.universal-music.co.jp/ado/wp-content/uploads/sites/4243/2022/01/ado_profile.jpg' },
+        { name: 'Vaundy', img: 'https://vaundy.jp/img/profile.jpg' },
+        { name: 'Official髭男dism', img: 'https://higedan.com/img/profile.jpg' }
     ];
     let selectedArtists = new Set();
 
@@ -103,10 +107,24 @@
         });
     }
 
+    document.getElementById('artistSearchInput').oninput = function() {
+        const q = this.value.toLowerCase();
+        const filtered = defaultArtists.filter(a => a.name.toLowerCase().includes(q));
+        if (q && !defaultArtists.find(a => a.name.toLowerCase() === q)) {
+            filtered.push({ name: this.value, img: '' });
+        }
+        renderArtists(filtered);
+    };
+
     document.getElementById('finishSelection').onclick = () => {
         localStorage.setItem('music_artists_selected', JSON.stringify(Array.from(selectedArtists)));
         document.getElementById('artistSelector').classList.remove('active');
         loadRecs();
+    };
+
+    document.getElementById('resetSelection').onclick = () => {
+        selectedArtists.clear();
+        renderArtists(defaultArtists);
     };
 
     async function loadRecs() {
@@ -115,7 +133,7 @@
         const recSection = document.getElementById('recommendationSection');
         const recList = document.getElementById('recommendationList');
         recSection.classList.remove('hidden');
-        recList.innerHTML = '読み込み中...';
+        recList.innerHTML = '<p class="text-center text-gray-500">おすすめを読み込み中...</p>';
         
         try {
             const q = selected[Math.floor(Math.random() * selected.length)];
@@ -125,20 +143,30 @@
             const doc = parser.parseFromString(html, 'text/html');
             const tracks = doc.querySelectorAll('.track-item');
             recList.innerHTML = '';
-            tracks.forEach((t, i) => {
-                if (i < 5) recList.appendChild(t.cloneNode(true));
-            });
-            recList.querySelectorAll('.play-btn').forEach(btn => {
-                btn.onclick = function() { playTrack(this.dataset.trackId, this.closest('.track-item').dataset.title); };
-            });
-        } catch (e) { console.error(e); }
+            if (tracks.length === 0) {
+                recList.innerHTML = '<p class="text-center text-gray-500">おすすめが見つかりませんでした。</p>';
+            } else {
+                tracks.forEach((t, i) => {
+                    if (i < 5) {
+                        const clone = t.cloneNode(true);
+                        recList.appendChild(clone);
+                    }
+                });
+                recList.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.onclick = function() { playTrack(this.dataset.trackId, this.closest('.track-item').dataset.title); };
+                });
+            }
+        } catch (e) { 
+            console.error(e);
+            recList.innerHTML = '<p class="text-center text-red-500">エラーが発生しました。</p>';
+        }
     }
 
     function playTrack(id, title) {
         const container = document.getElementById('player-container');
         container.classList.remove('hidden');
         document.getElementById('nowPlayingTitle').textContent = title;
-        document.getElementById('player').src = `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${id}&auto_play=true`;
+        document.getElementById('player').src = `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${id}&auto_play=true&color=%233b82f6&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
     }
 
     document.querySelectorAll('.play-btn').forEach(btn => {
