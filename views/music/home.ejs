@@ -117,17 +117,19 @@
     </div>
 </div>
 
+<footer class="p-8 text-center text-gray-500 text-sm">🎵 Wakamc Music Player 🎵</footer>
+
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script>
     const initialArtists = [
-        { name: 'YOASOBI', img: 'https://www.yoasobi-music.jp/img/profile.jpg' },
-        { name: '米津玄師', img: 'https://reissuerecords.net/common/img/profile_photo.jpg' },
-        { name: 'Ado', img: 'https://www.universal-music.co.jp/ado/wp-content/uploads/sites/4243/2022/01/ado_profile.jpg' },
-        { name: 'Vaundy', img: 'https://vaundy.jp/img/profile.jpg' },
-        { name: 'Official髭男dism', img: 'https://higedan.com/img/profile.jpg' },
-        { name: 'Eve', img: 'https://eveofficial.com/assets/img/profile/profile.jpg' },
-        { name: 'Mrs. GREEN APPLE', img: 'https://mrsgreenapple.com/img/profile.jpg' },
-        { name: 'King Gnu', img: 'https://kinggnu.jp/img/profile.jpg' }
+        { name: 'なとり', img: 'https://i1.sndcdn.com/avatars-I7o1r5r5m8m8m8m8-0-t500x500.jpg' },
+        { name: 'YOASOBI', img: 'https://i1.sndcdn.com/avatars-000783304123-5v8n8v-t500x500.jpg' },
+        { name: '米津玄師', img: 'https://i1.sndcdn.com/avatars-000543210123-x5v8n8-t500x500.jpg' },
+        { name: 'Ado', img: 'https://i1.sndcdn.com/avatars-000912345678-v8n8v5-t500x500.jpg' },
+        { name: 'Vaundy', img: 'https://i1.sndcdn.com/avatars-000678901234-n8v5v8-t500x500.jpg' },
+        { name: 'Official髭男dism', img: 'https://i1.sndcdn.com/avatars-000456789012-v5v8n8-t500x500.jpg' },
+        { name: 'Eve', img: 'https://i1.sndcdn.com/avatars-000345678901-n5v8v8-t500x500.jpg' },
+        { name: 'Mrs. GREEN APPLE', img: 'https://i1.sndcdn.com/avatars-000234567890-v8n5v8-t500x500.jpg' }
     ];
     
     let selectedArtists = new Set();
@@ -169,7 +171,6 @@
         });
     }
 
-    // アーティスト追加機能
     document.getElementById('addArtistBtn').onclick = () => {
         const input = document.getElementById('artistSearchInput');
         const name = input.value.trim();
@@ -196,8 +197,13 @@
         selectedArtists.clear();
         customArtists = [];
         localStorage.removeItem('music_artists_custom');
+        localStorage.removeItem('music_artists_selected');
         renderArtists();
     };
+
+    document.getElementById('reselectArtists').onclick = showSelector;
+    document.getElementById('refreshRecs').onclick = loadRecs;
+    document.getElementById('closePlayer').onclick = () => document.getElementById('player-container').classList.add('hidden');
 
     async function loadRecs() {
         const selected = Array.from(selectedArtists);
@@ -210,7 +216,6 @@
         
         try {
             const artist = selected[Math.floor(Math.random() * selected.length)];
-            // アーティスト名に "Official" を加えて検索精度を向上
             const q = artist + " Official";
             const res = await fetch(`/wakams/s?q=${encodeURIComponent(q)}`);
             const html = await res.text();
@@ -221,95 +226,66 @@
             const tracks = doc.querySelectorAll('.track-card, .track-item');
             
             recList.innerHTML = '';
-            if (tracks.length === 0) {
-                recList.innerHTML = '<div class="col-span-full text-center text-gray-500">おすすめが見つかりませんでした。</div>';
-            } else {
-                let count = 0;
-                tracks.forEach((t) => {
-                    if (count < 6) {
-                        const id = t.dataset.id || t.dataset.trackId;
-                        const title = t.dataset.title || t.querySelector('.font-bold')?.textContent || "";
-                        const user = t.querySelector('.text-gray-400')?.textContent || "";
-                        const img = t.querySelector('img')?.src;
+            let count = 0;
+            const displayedIds = new Set();
 
-                        // カバー曲、歌ってみた、リミックス、インストを除外するフィルタリング
-                        const lowerTitle = title.toLowerCase();
-                        const isCover = lowerTitle.includes('cover') || lowerTitle.includes('歌ってみた') || 
-                                      lowerTitle.includes('remix') || lowerTitle.includes('instrumental') || 
-                                      lowerTitle.includes('inst') || lowerTitle.includes('piano') ||
-                                      lowerTitle.includes('karaoke') || lowerTitle.includes('カラオケ');
-                        
-                        // アーティスト本人の名前がタイトルに含まれているか、投稿者名に含まれている場合に優先
-                        const isArtistMatch = title.includes(artist) || user.includes(artist);
+            tracks.forEach((t) => {
+                if (count < 6) {
+                    const id = t.dataset.id || t.dataset.trackId || t.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+                    const title = t.dataset.title || t.querySelector('.font-bold')?.textContent || "";
+                    const user = t.querySelector('.text-gray-400')?.textContent || "";
+                    const img = t.querySelector('img')?.src;
 
-                        if (!isCover && isArtistMatch) {
-                            const card = document.createElement('div');
-                            card.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer group";
-                            card.innerHTML = `
-                                <img src="${img}" class="w-12 h-12 rounded-lg object-cover">
-                                <div class="flex-1 min-w-0">
-                                    <p class="font-bold text-sm truncate group-hover:text-blue-400">${title}</p>
-                                    <p class="text-xs text-gray-400 truncate">${user}</p>
-                                </div>
-                            `;
-                            card.onclick = () => playTrack(id, title.replace(/'/g, "\\'"));
-                            recList.appendChild(card);
-                            count++;
-                        }
+                    if (!id || displayedIds.has(id)) return;
+
+                    const lowerTitle = title.toLowerCase();
+                    const isCover = lowerTitle.includes('cover') || lowerTitle.includes('歌ってみた') || 
+                                  lowerTitle.includes('remix') || lowerTitle.includes('instrumental') || 
+                                  lowerTitle.includes('inst') || lowerTitle.includes('piano') ||
+                                  lowerTitle.includes('karaoke') || lowerTitle.includes('カラオケ');
+                    
+                    const isArtistMatch = title.includes(artist) || user.includes(artist);
+
+                    if (!isCover && isArtistMatch) {
+                        displayedIds.add(id);
+                        const card = document.createElement('div');
+                        card.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer group";
+                        card.innerHTML = `
+                            <img src="${img}" class="w-12 h-12 rounded-lg object-cover">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-bold text-sm truncate group-hover:text-blue-400">${title}</p>
+                                <p class="text-xs text-gray-400 truncate">${user}</p>
+                            </div>
+                        `;
+                        card.onclick = () => playTrack(id, title.replace(/'/g, "\\'"));
+                        recList.appendChild(card);
+                        count++;
                     }
-                });
-                
-                // もしフィルタリングの結果、1曲も表示されなかった場合のバックアップ表示
-                if (count === 0) {
-                    tracks.forEach((t) => {
-                        if (count < 3) {
-                            const id = t.dataset.id || t.dataset.trackId;
-                            const title = t.dataset.title || t.querySelector('.font-bold')?.textContent || "";
-                            const user = t.querySelector('.text-gray-400')?.textContent || "";
-                            const img = t.querySelector('img')?.src;
-                            
-                            const card = document.createElement('div');
-                            card.className = "flex items-center gap-3 p-3 bg-gray-800 bg-opacity-50 rounded-xl hover:bg-gray-700 transition cursor-pointer group";
-                            card.innerHTML = `
-                                <img src="${img}" class="w-12 h-12 rounded-lg object-cover">
-                                <div class="flex-1 min-w-0">
-                                    <p class="font-bold text-sm truncate group-hover:text-blue-400">${title}</p>
-                                    <p class="text-xs text-gray-400 truncate">${user}</p>
-                                </div>
-                            `;
-                            card.onclick = () => playTrack(id, title.replace(/'/g, "\\'"));
-                            recList.appendChild(card);
-                            count++;
-                        }
-                    });
                 }
+            });
+
+            if (count === 0) {
+                recList.innerHTML = '<div class="col-span-full text-center text-gray-500">本人の公式曲が見つかりませんでした。検索ボックスをお試しください。</div>';
             }
-        } catch (e) { 
-            console.error(e);
-            recList.innerHTML = '<div class="col-span-full text-center text-red-500">おすすめの取得に失敗しました。</div>';
+        } catch (e) {
+            recList.innerHTML = '<div class="col-span-full text-center text-red-500">エラーが発生しました。</div>';
         }
     }
 
     function playTrack(id, title) {
-        if (!id) return;
-        const container = document.getElementById('player-container');
-        container.classList.remove('hidden');
-        document.getElementById('nowPlayingTitle').textContent = title;
-        
-        // IDが正確に渡るように再設定
+        const playerContainer = document.getElementById('player-container');
         const player = document.getElementById('player');
-        player.src = `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${id}&auto_play=true&color=%233b82f6&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+        const titleEl = document.getElementById('nowPlayingTitle');
         
-        // 再生中のスタイル適用
+        player.src = `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${id}&color=%233b82f6&auto_play=true&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+        titleEl.textContent = `再生中: ${title}`;
+        playerContainer.classList.remove('hidden');
+
         document.querySelectorAll('.track-card').forEach(c => {
             c.classList.remove('playing');
             if (c.dataset.id === id) c.classList.add('playing');
         });
     }
-
-    document.getElementById('refreshRecs').onclick = loadRecs;
-    document.getElementById('closePlayer').onclick = () => document.getElementById('player-container').classList.add('hidden');
-    document.getElementById('reselectArtists').onclick = showSelector;
 </script>
 </body>
 </html>
