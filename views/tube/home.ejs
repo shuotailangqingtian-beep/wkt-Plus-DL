@@ -11,169 +11,29 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="/js/tube.js"></script>
     <style>
-        .hero-section {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 50vh;
-            background-color: #2d3748;
-        }
-        .searchbox {
-            position: absolute;
-            transform: translate(-50%, 0%);
-            width: 80%;
-            max-width: 700px;
-            padding: 0.75rem;
-            font-size: 1.2rem;
-            border-radius: 25px;
-            border: none;
-            background-color: rgba(255, 255, 255, 0.1);
-            color: white;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-        .searchbox:focus {
-            background-color: rgba(255, 255, 255, 0.3);
-            box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-        }
-        .app-card-container {
-            display: flex;
-            justify-content: center;
-            gap: 16px;
-            margin-top: 30px;
-            flex-wrap: wrap;
-        }
-        .app-card {
-            background-color: #1a202c;
-            border-radius: 25px;
-            padding: 15px;
-            width: 180px;
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border: 2px solid #4a5568;
-        }
-        .app-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
-        }
-        .app-card img {
-            width: 100%;
-            height: auto;
-            border-radius: 10px;
-            margin-bottom: 10px;
-        }
-        .app-card h3 {
-            color: white;
-            font-size: 1.1rem;
-            margin-bottom: 8px;
-        }
-        .app-card p {
-            color: #cbd5e0;
-            font-size: 0.875rem;
-        }
-        footer {
-            background-color: #2d3748;
-            color: #cbd5e0;
-            padding: 1rem;
-            text-align: center;
-            margin-top: 50px;
-        }
-        .logo img {
-            height: 30px;
-            width: auto;
-        }
-        /* Shorts UI */
-        #shortsOverlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: black;
-            z-index: 9999;
-            flex-direction: column;
-            overflow: hidden;
-        }
+        .hero-section { display: flex; justify-content: center; align-items: center; height: 50vh; background-color: #2d3748; }
+        .searchbox { position: absolute; transform: translate(-50%, 0%); width: 80%; max-width: 700px; padding: 0.75rem; font-size: 1.2rem; border-radius: 25px; border: none; background-color: rgba(255, 255, 255, 0.1); color: white; outline: none; transition: all 0.3s ease; }
+        .searchbox:focus { background-color: rgba(255, 255, 255, 0.3); box-shadow: 0 0 8px rgba(255, 255, 255, 0.5); }
+        .app-card-container { display: flex; justify-content: center; gap: 16px; margin-top: 30px; flex-wrap: wrap; }
+        .app-card { background-color: #1a202c; border-radius: 25px; padding: 15px; width: 180px; text-align: center; transition: transform 0.3s ease, box-shadow 0.3s ease; border: 2px solid #4a5568; }
+        .app-card:hover { transform: translateY(-10px); box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1); }
+        .app-card img { width: 100%; height: auto; border-radius: 10px; margin-bottom: 10px; }
+        .app-card h3 { color: white; font-size: 1.1rem; margin-bottom: 8px; }
+        .app-card p { color: #cbd5e0; font-size: 0.875rem; }
+        footer { background-color: #2d3748; color: #cbd5e0; padding: 1rem; text-align: center; margin-top: 50px; }
+        .logo img { height: 30px; width: auto; }
+        /* Shorts UI (追加) */
+        #shortsOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 9999; flex-direction: column; overflow: hidden; }
         #shortsOverlay.active { display: flex; }
-        .shorts-container {
-            flex: 1;
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-        .shorts-video-wrapper {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: absolute;
-            top: 0;
-            left: 0;
-            transition: transform 0.3s ease-out;
-        }
-        .shorts-video-wrapper video {
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-            object-fit: contain;
-        }
-        .shorts-info {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            color: white;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-            pointer-events: none;
-            z-index: 10002;
-        }
-        .shorts-controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            z-index: 10001;
-        }
-        .shorts-btn {
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        .shorts-close {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 32px;
-            color: white;
-            cursor: pointer;
-            z-index: 10001;
-        }
-        #shortsLoading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            text-align: center;
-            z-index: 10003;
-        }
+        .shorts-container { flex: 1; position: relative; }
+        .shorts-video-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .shorts-video-wrapper video { max-width: 100%; max-height: 100%; }
+        .shorts-close { position: absolute; top: 20px; left: 20px; font-size: 32px; color: white; cursor: pointer; z-index: 10001; }
+        .shorts-controls { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 20px; z-index: 10001; }
+        .shorts-btn { background: rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 24px; }
     </style>
 </head>
 <body class="bg-gray-900 font-sans">
-
     <header class="bg-gray-800 text-white p-4">
         <nav class="flex justify-between items-center">
             <a href="/?r=y" class="logo">
@@ -181,9 +41,6 @@
             </a>
             <div class="space-x-6 flex items-center">
                 <button id="shortsBtn" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-full flex items-center gap-1 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                    </svg>
                     Shorts
                 </button>
                 <button id="secretModeBtn" class="hover:text-gray-300 flex items-center transition-colors">🤫シークレット</button>
@@ -208,179 +65,112 @@
 
     <section class="py-10 px-4 bg-gray-800">
         <div class="app-card-container">
-            <div class="app-card">
-                <a href="/blog/b/access"><img src="https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_server_2.png"></a>
-                <h3>サーバー状況</h3>
-                <p>各サーバーの稼働状況を確認できます。</p>
-            </div>
-            <div class="app-card">
-                <a href="/other"><img src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.youtube.com/&size=256"></a>
-                <h3>他のYouTubeサイト</h3>
-                <p>他の方が作ったYouTubeサイトを搭載。</p>
-            </div>
-            <div class="app-card">
-                <a href="/game"><img src="https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_game_1.png"></a>
-                <h3>APP</h3>
-                <p>Webゲームをプレイ。</p>
-            </div>
-            <div class="app-card">
-                <a href="/wakams"><img src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://soundcloud.com/&size=256"></a>
-                <h3>Music</h3>
-                <p>音楽を聴くためのアプリ</p>
-            </div>
-            <div class="app-card">
-                <a href="/tools"><img src="https://wsrv.nl/?url=https://icooon-mono.com/i/icon_10173/icon_101730_256.png"></a>
-                <h3>プロキシ＆ツール</h3>
-                <p>あなたを助けるかもしれない</p>
-            </div>
-            <div class="app-card">
-                <a href="/blog/b/form"><img src="https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_otoiawase_1.png"></a>
-                <h3>お問い合わせ</h3>
-                <p>サイトの管理者に問い合わせる</p>
-            </div>
+            <div class="app-card"><a href="/blog/b/access"><img src="https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_server_2.png"></a><h3>サーバー状況</h3><p>各サーバーの稼働状況を確認できます。</p></div>
+            <div class="app-card"><a href="/other"><img src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.youtube.com/&size=256"></a><h3>他のYouTubeサイト</h3><p>他の方が作ったYouTubeサイトを搭載。</p></div>
+            <div class="app-card"><a href="/game"><img src="https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_game_1.png"></a><h3>APP</h3><p>Webゲームをプレイ。</p></div>
+            <div class="app-card"><a href="/wakams"><img src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://soundcloud.com/&size=256"></a><h3>Music</h3><p>音楽を聴くためのアプリ</p></div>
+            <div class="app-card"><a href="/tools"><img src="https://wsrv.nl/?url=https://icooon-mono.com/i/icon_10173/icon_101730_256.png"></a><h3>プロキシ＆ツール</h3><p>あなたを助けるかもしれない</p></div>
+            <div class="app-card"><a href="/blog/b/form"><img src="https://wsrv.nl/?url=https://kotonohaworks.com/free-icons/wp-content/uploads/kkrn_icon_otoiawase_1.png"></a><h3>お問い合わせ</h3><p>サイトの管理者に問い合わせる</p></div>
+        </div>
+        <div style="height:480px;" class="w-full max-w-3xl mx-auto mt-10">
+            <script src="//accaii.com/wktplus/widget.js" async></script>
         </div>
     </section>
 
-    <!-- Shorts オーバーレイ UI -->
-    <div id="shortsOverlay">
-        <div class="shorts-close" id="shortsClose">×</div>
-        <div id="shortsLoading" style="display:none;">動画を読み込み中...</div>
-        <div class="shorts-container" id="shortsContainer"></div>
-        <div class="shorts-controls">
-            <div class="shorts-btn" id="shortsNext">↓</div>
-            <div class="shorts-btn" id="shortsPrev">↑</div>
+    <div id="settingsPanel" class="fixed top-0 left-0 w-full bg-white dark:bg-gray-900 shadow-lg p-6 -translate-y-full duration-300">
+        <div class="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white max-w-2xl mx-auto p-6 rounded-lg shadow-md">
+          <h1 class="text-2xl font-bold mb-4">再生方法の設定</h1>
+          <form id="settingsForm" class="space-y-4">
+            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="normal" class="mr-2"> <span class="font-semibold">通常</span></label>
+            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="edu" class="mr-2"> <span class="font-semibold">Education</span></label>
+            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="nocookie" class="mr-2"> <span class="font-semibold">Nocookie</span></label>
+            <button type="button" id="saveButton" class="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">保存</button>
+          </form>
+          <button id="closeSettings" class="absolute top-4 right-4 text-4xl font-bold">×</button>
         </div>
     </div>
 
+    <div id="shortsOverlay">
+        <div class="shorts-close" id="shortsClose">×</div>
+        <div class="shorts-container" id="shortsContainer"></div>
+        <div class="shorts-controls"><div class="shorts-btn" id="shortsNext">↓</div><div class="shorts-btn" id="shortsPrev">↑</div></div>
+    </div>
+
+    <footer><p>♪( ´▽｀)<br>現在のバージョン: <%= version %> (<%= isOutdated ? '更新あり' : '最新版' %>)</p></footer>
+
 <script>
-// Shorts 機能の修正
+// ==========================================
+// オリジナルの検索ロジック (維持)
+// ==========================================
+document.getElementById("searchForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const q = document.getElementById("searchbox").value.trim();
+    const ytRegex = /(?:https?:\/\/)?(?:www\.)?youtu(?:\.be\/|be\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([\w\-]+)/;
+    const m = q.match(ytRegex);
+    if (m) window.location.href = `/wkt/watch/${m[1]}`;
+    else window.location.href = `/wkt/s?q=${encodeURIComponent(q)}`;
+});
+
+// ==========================================
+// Shorts 機能 (追加)
+// ==========================================
 (function() {
-    let shortsList = [];
-    let currentIndex = 0;
-    let isLoading = false;
-    let searchTerms = [];
-    let termIndex = 0;
+    let shorts = []; let current = 0; let loading = false;
     const overlay = document.getElementById('shortsOverlay');
     const container = document.getElementById('shortsContainer');
-    const loading = document.getElementById('shortsLoading');
 
-    document.getElementById('shortsBtn').addEventListener('click', async () => {
-        overlay.classList.add('active');
-        if (shortsList.length === 0) {
-            initSearchTerms();
-            await loadMoreShorts();
-        } else {
-            playShort(currentIndex);
-        }
-    });
+    document.getElementById('shortsBtn').onclick = () => { overlay.classList.add('active'); if (shorts.length === 0) loadMore(); else play(current); };
+    document.getElementById('shortsClose').onclick = () => { overlay.classList.remove('active'); const v = container.querySelector('video'); if (v) v.pause(); const a = container.querySelector('audio'); if (a) a.pause(); };
 
-    document.getElementById('shortsClose').addEventListener('click', () => {
-        overlay.classList.remove('active');
-        const v = container.querySelector('video'); if (v) v.pause();
-        const a = container.querySelector('audio'); if (a) a.pause();
-    });
-
-    function initSearchTerms() {
-        let history = JSON.parse(localStorage.getItem('wakametubeserhistory') || '[]');
-        let query = history.length > 0 ? history[history.length - 1] : 'Shorts';
-        searchTerms = [query, 'Shorts', 'ショート動画', '面白動画', 'トレンド'];
-        termIndex = 0;
-        shortsList = [];
-        currentIndex = 0;
+    async function loadMore() {
+        if (loading) return; loading = true;
+        try {
+            const h = JSON.parse(localStorage.getItem('wakametubeserhistory') || '[]');
+            const q = h.length > 0 ? h[h.length - 1] : 'Shorts';
+            const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(q)}&type=video`);
+            const html = await res.text();
+            const ids = html.match(/\/wkt\/watch\/([a-zA-Z0-9_-]{11})/g);
+            if (ids) {
+                ids.forEach(idPath => {
+                    const id = idPath.split('/').pop();
+                    if (!shorts.find(v => v.id === id)) shorts.push({ id });
+                });
+                if (current === 0) play(0);
+            }
+        } catch (e) { console.error(e); } finally { loading = false; }
     }
 
-    async function loadMoreShorts() {
-        if (isLoading) return;
-        isLoading = true;
-        loading.style.display = 'block';
-        
+    async function play(idx) {
+        if (idx < 0 || idx >= shorts.length) return; current = idx;
+        container.innerHTML = '<div class="text-white text-center mt-20">読み込み中...</div>';
+        if (idx >= shorts.length - 3) loadMore();
         try {
-            let newVideos = [];
-            while (newVideos.length < 5 && termIndex < searchTerms.length) {
-                const term = searchTerms[termIndex];
-                // 検索APIを直接叩く
-                const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(term)}&type=video`);
-                const html = await res.text();
-                // HTMLをパースして動画IDを抽出
-                const ids = html.match(/\/wkt\/watch\/([a-zA-Z0-9_-]{11})/g);
-                if (ids) {
-                    ids.forEach(idPath => {
-                        const id = idPath.split('/').pop();
-                        if (!shortsList.find(v => v.id === id) && !newVideos.find(v => v.id === id)) {
-                            newVideos.push({ id, title: 'Shorts Video', author: 'Creator' });
-                        }
-                    });
-                }
-                termIndex++;
-            }
-            
-            if (newVideos.length > 0) {
-                const isFirst = shortsList.length === 0;
-                shortsList = shortsList.concat(newVideos);
-                if (isFirst) playShort(0);
-            }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            isLoading = false;
-            loading.style.display = 'none';
-        }
-    }
-
-    async function playShort(index) {
-        if (index < 0 || index >= shortsList.length) return;
-        currentIndex = index;
-        container.innerHTML = '';
-        if (index >= shortsList.length - 2) loadMoreShorts();
-
-        const videoData = shortsList[index];
-        const wrapper = document.createElement('div');
-        wrapper.className = 'shorts-video-wrapper';
-        
-        try {
-            const res = await fetch(`/wkt/back/next/${videoData.id}`);
+            const res = await fetch(`/wkt/back/next/${shorts[idx].id}`);
             const data = await res.json();
-            let vUrl = data.stream_url;
-            let aUrl = data.audioUrl || '';
-            if (data.streamUrls) {
-                const t = data.streamUrls.find(s => s.resolution?.includes('720') && s.container === 'mp4') || data.streamUrls[0];
-                if (t) vUrl = t.url;
-            }
-
-            wrapper.innerHTML = `
-                <video id="shortsVideo" src="${vUrl}" loop playsinline style="width:100%;height:100%"></video>
-                <audio id="shortsAudio" src="${aUrl}" loop></audio>
-                <div class="shorts-info"><h3 class="font-bold">${data.title || videoData.title}</h3></div>
-            `;
-            container.appendChild(wrapper);
-            const v = wrapper.querySelector('video');
-            const a = wrapper.querySelector('audio');
+            let vUrl = data.stream_url; let aUrl = data.audioUrl || '';
+            if (data.streamUrls) { const t = data.streamUrls.find(s => s.resolution?.includes('720') && s.container === 'mp4') || data.streamUrls[0]; if (t) vUrl = t.url; }
+            container.innerHTML = `<div class="shorts-video-wrapper"><video id="sv" src="${vUrl}" loop playsinline style="width:100%;height:100%"></video><audio id="sa" src="${aUrl}" loop></audio></div>`;
+            const v = document.getElementById('sv'); const a = document.getElementById('sa');
             v.onplay = () => { if (a.src && a.src !== window.location.href) a.play(); };
             v.onpause = () => a.pause();
             v.onseeking = () => a.currentTime = v.currentTime;
             v.play().catch(() => { v.muted = true; v.play(); });
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { container.innerHTML = '<div class="text-white text-center mt-20">エラーが発生しました</div>'; }
     }
-
-    document.getElementById('shortsNext').onclick = () => playShort(currentIndex + 1);
-    document.getElementById('shortsPrev').onclick = () => playShort(currentIndex - 1);
+    document.getElementById('shortsNext').onclick = () => play(current + 1);
+    document.getElementById('shortsPrev').onclick = () => play(current - 1);
 })();
 
-// メッセージ表示機能
-function showMessage(text) {
-    const m = $('<div class="fixed top-4 right-4 bg-blue-600 text-white p-4 rounded shadow-lg z-50"></div>').text(text);
-    $('body').append(m);
-    setTimeout(() => m.fadeOut(() => m.remove()), 3000);
-}
-
-// 既存の検索ボックス等のロジック
-$('#searchForm').submit(function(e) {
-    e.preventDefault();
-    const q = $('#searchbox').val();
-    window.location.href = `/wkt/s?q=${encodeURIComponent(q)}`;
-});
+// ==========================================
+// 設定パネル (維持)
+// ==========================================
+document.getElementById('openSettings').onclick = () => document.getElementById('settingsPanel').classList.remove('-translate-y-full');
+document.getElementById('closeSettings').onclick = () => document.getElementById('settingsPanel').classList.add('-translate-y-full');
+document.getElementById('saveButton').onclick = () => {
+    const mode = document.querySelector('input[name=playbackMode]:checked').value;
+    document.cookie = `playbackMode=${mode}; path=/; max-age=31536000`;
+    document.getElementById('settingsPanel').classList.add('-translate-y-full');
+};
 </script>
 </body>
 </html>

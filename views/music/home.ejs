@@ -128,7 +128,6 @@
             tracks.forEach((t, i) => {
                 if (i < 5) recList.appendChild(t.cloneNode(true));
             });
-            // クローンしたボタンにイベントを再設定
             recList.querySelectorAll('.play-btn').forEach(btn => {
                 btn.onclick = function() { playTrack(this.dataset.trackId, this.closest('.track-item').dataset.title); };
             });
