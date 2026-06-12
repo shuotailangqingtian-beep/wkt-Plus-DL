@@ -9,9 +9,9 @@
     <style>
         .track-card:hover { background: #374151; }
         .playing { border-left: 4px solid #3b82f6; background: #2d3748; }
-        .music-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
-        #player-overlay { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(17, 24, 39, 0.95); backdrop-blur: md; z-index: 100; border-top: 1px solid #374151; padding: 16px; }
-        #player-overlay.active { display: block; }
+        .music-img { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; }
+        #player-overlay { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(17, 24, 39, 0.98); backdrop-filter: blur(10px); z-index: 100; border-top: 1px solid #374151; padding: 12px; }
+        #player-overlay.active { display: flex; }
     </style>
 </head>
 <body class="bg-gray-900 text-white pb-32">
@@ -19,38 +19,36 @@
 <header class="p-4 bg-gray-800 flex items-center gap-4 sticky top-0 z-40 shadow-xl">
     <a href="/wkt" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-full transition">🏠</a>
     <div class="flex-1 flex gap-2">
-        <input type="text" id="musicSearchInput" placeholder="YouTubeで音楽を検索" class="flex-1 p-3 rounded-full bg-gray-700 border border-transparent focus:border-blue-500 outline-none px-6">
+        <input type="text" id="musicSearchInput" placeholder="音楽を検索 (アーティスト、曲名)" class="flex-1 p-3 rounded-full bg-gray-700 border border-transparent focus:border-blue-500 outline-none px-6">
         <button id="musicSearchBtn" class="p-3 bg-blue-600 hover:bg-blue-700 rounded-full transition">🔍</button>
     </div>
 </header>
 
 <main class="p-4 max-w-3xl mx-auto">
     <div id="recommendationSection" class="mb-12">
-        <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">✨ あなたへのおすすめ</h2>
-        <div id="recommendationList" class="grid gap-3">
-            <!-- 履歴ベースのおすすめを表示 -->
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">🎧 あなたへのおすすめ</h2>
+        <div id="recommendationList" class="grid gap-2">
+            <p class="text-gray-500 text-center py-10">履歴からおすすめを読み込み中...</p>
         </div>
     </div>
 
     <div id="searchSection" class="hidden">
-        <h2 id="searchTitle" class="text-2xl font-bold mb-4 border-b border-gray-800 pb-2">検索結果</h2>
-        <div id="searchList" class="grid gap-3"></div>
+        <h2 id="searchTitle" class="text-xl font-bold mb-4 border-b border-gray-800 pb-2">検索結果</h2>
+        <div id="searchList" class="grid gap-2"></div>
     </div>
 </main>
 
-<!-- 固定プレイヤー (Choco風プロキシ再生) -->
-<div id="player-overlay">
-    <div class="max-w-3xl mx-auto flex items-center gap-4">
-        <img id="playerThumb" src="" class="w-12 h-12 rounded shadow-lg">
-        <div class="flex-1 min-w-0">
-            <p id="playerTitle" class="font-bold truncate text-sm">曲名</p>
-            <p id="playerAuthor" class="text-xs text-gray-400 truncate">アーティスト</p>
-        </div>
-        <div class="flex items-center gap-4">
-            <button id="prevBtn" class="text-2xl">⏮</button>
-            <button id="playPauseBtn" class="text-3xl">⏸</button>
-            <button id="nextBtn" class="text-2xl">⏭</button>
-        </div>
+<!-- 固定プレイヤー -->
+<div id="player-overlay" class="items-center gap-4 px-6">
+    <img id="playerThumb" src="" class="w-12 h-12 rounded shadow-lg">
+    <div class="flex-1 min-w-0">
+        <p id="playerTitle" class="font-bold truncate text-sm">曲名</p>
+        <p id="playerAuthor" class="text-xs text-gray-400 truncate">アーティスト</p>
+    </div>
+    <div class="flex items-center gap-6">
+        <button id="prevBtn" class="text-xl">⏮</button>
+        <button id="playPauseBtn" class="text-3xl">⏸</button>
+        <button id="nextBtn" class="text-xl">⏭</button>
     </div>
     <div id="hiddenPlayer" style="display:none"></div>
 </div>
@@ -59,61 +57,64 @@
     let playlist = [];
     let currentIndex = -1;
     let isPlaying = false;
-    let ytPlayer = null;
 
-    // プロキシサムネイルURL生成
+    // プロキシサムネイルURL
     function getProxyThumb(id) {
         return `https://wsrv.nl/?url=https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
     }
 
-    // 履歴に基づいたおすすめ取得
+    // 音楽のみをフィルタリングして取得
+    async function fetchMusic(query) {
+        // "Official Audio" や "Topic" を付与して音楽の精度を高める
+        const q = `${query} Official Audio`;
+        try {
+            const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(q)}&type=video`);
+            const html = await res.text();
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            const links = temp.querySelectorAll('a[href*="/wkt/watch/"]');
+            const items = [];
+            const idSet = new Set();
+
+            links.forEach(link => {
+                const idMatch = link.href.match(/\/wkt\/watch\/([a-zA-Z0-9_-]{11})/);
+                if (idMatch && !idSet.has(idMatch[1])) {
+                    const id = idMatch[1];
+                    const title = link.innerText.trim();
+                    // カバーや歌ってみたを排除
+                    if (!title.toLowerCase().includes('cover') && !title.includes('歌ってみた')) {
+                        idSet.add(id);
+                        items.push({ id, title, author: 'YouTube Music' });
+                    }
+                }
+            });
+            return items;
+        } catch (e) { return []; }
+    }
+
     async function loadRecommendations() {
         const history = JSON.parse(localStorage.getItem('wakametubeserhistory') || '[]');
         const musicHistory = JSON.parse(localStorage.getItem('music_history') || '[]');
         const q = musicHistory.length > 0 ? musicHistory[0].title : (history.length > 0 ? history[history.length-1] : '邦楽 人気');
         
-        try {
-            const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(q)}&type=video`);
-            const html = await res.text();
-            const idSet = new Set();
-            const regex = /\/wkt\/watch\/([a-zA-Z0-9_-]{11})/g;
-            let match;
-            const items = [];
-            
-            // 簡易的なパース
-            const temp = document.createElement('div');
-            temp.innerHTML = html;
-            const links = temp.querySelectorAll('a[href*="/wkt/watch/"]');
-            
-            links.forEach(link => {
-                const idMatch = link.href.match(/\/wkt\/watch\/([a-zA-Z0-9_-]{11})/);
-                if (idMatch && !idSet.has(idMatch[1])) {
-                    const id = idMatch[1];
-                    idSet.add(id);
-                    const title = link.innerText.trim() || "動画";
-                    items.push({ id, title, author: 'YouTube' });
-                }
-            });
-
-            const list = document.getElementById('recommendationList');
-            list.innerHTML = '';
-            items.slice(0, 10).forEach(item => {
-                const div = createTrackCard(item);
-                list.appendChild(div);
-            });
-            if (playlist.length === 0) playlist = items.slice(0, 10);
-        } catch (e) { console.error(e); }
+        const items = await fetchMusic(q);
+        const list = document.getElementById('recommendationList');
+        list.innerHTML = '';
+        items.slice(0, 10).forEach(item => {
+            list.appendChild(createTrackCard(item));
+        });
+        if (playlist.length === 0) playlist = items;
     }
 
     function createTrackCard(item) {
         const div = document.createElement('div');
-        div.className = 'flex items-center gap-4 p-3 bg-gray-800 rounded-xl track-card transition cursor-pointer group';
+        div.className = 'flex items-center gap-4 p-3 bg-gray-800 rounded-lg track-card transition cursor-pointer group';
         div.onclick = () => playTrack(item);
         div.innerHTML = `
             <img src="${getProxyThumb(item.id)}" class="music-img shadow-md">
             <div class="flex-1 min-w-0">
                 <p class="font-bold truncate group-hover:text-blue-400">${item.title}</p>
-                <p class="text-sm text-gray-400 truncate">${item.author}</p>
+                <p class="text-xs text-gray-400 truncate">${item.author}</p>
             </div>
         `;
         return div;
@@ -123,82 +124,50 @@
         currentIndex = playlist.findIndex(i => i.id === item.id);
         if (currentIndex === -1) { playlist.push(item); currentIndex = playlist.length - 1; }
         
-        // 履歴に保存
+        // 履歴保存
         let history = JSON.parse(localStorage.getItem('music_history') || '[]');
         history = [item, ...history.filter(i => i.id !== item.id)].slice(0, 20);
         localStorage.setItem('music_history', JSON.stringify(history));
 
-        document.getElementById('player-overlay').classList.add('active');
-        document.getElementById('playerTitle').innerText = item.title;
-        document.getElementById('playerAuthor').innerText = item.author;
-        document.getElementById('playerThumb').src = getProxyThumb(item.id);
+        $('#player-overlay').addClass('active');
+        $('#playerTitle').text(item.title);
+        $('#playerAuthor').text(item.author);
+        $('#playerThumb').attr('src', getProxyThumb(item.id));
 
-        // 再生ロジック (Education Embed)
         const embedUrl = `https://www.youtube-nocookie.com/embed/${item.id}?autoplay=1&enablejsapi=1`;
         document.getElementById('hiddenPlayer').innerHTML = `<iframe id="ytIframe" src="${embedUrl}" allow="autoplay"></iframe>`;
         
         isPlaying = true;
-        document.getElementById('playPauseBtn').innerText = '⏸';
+        $('#playPauseBtn').text('⏸');
     }
 
-    // 検索機能
-    document.getElementById('musicSearchBtn').onclick = async () => {
-        const q = document.getElementById('musicSearchInput').value.trim();
+    $('#musicSearchBtn').click(async () => {
+        const q = $('#musicSearchInput').val().trim();
         if (!q) return;
-        
-        const section = document.getElementById('searchSection');
-        const list = document.getElementById('searchList');
-        section.classList.remove('hidden');
-        list.innerHTML = '<p class="text-center py-10">検索中...</p>';
-        
-        try {
-            const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(q)}&type=video`);
-            const html = await res.text();
-            const temp = document.createElement('div');
-            temp.innerHTML = html;
-            const links = temp.querySelectorAll('a[href*="/wkt/watch/"]');
-            const items = [];
-            const idSet = new Set();
+        $('#searchSection').removeClass('hidden');
+        $('#searchList').html('<p class="text-center py-10 text-gray-500">検索中...</p>');
+        const items = await fetchMusic(q);
+        $('#searchList').empty();
+        items.forEach(item => $('#searchList').append(createTrackCard(item)));
+        playlist = items;
+    });
 
-            links.forEach(link => {
-                const idMatch = link.href.match(/\/wkt\/watch\/([a-zA-Z0-9_-]{11})/);
-                if (idMatch && !idSet.has(idMatch[1])) {
-                    const id = idMatch[1];
-                    idSet.add(id);
-                    items.push({ id, title: link.innerText.trim(), author: 'YouTube' });
-                }
-            });
-
-            list.innerHTML = '';
-            items.forEach(item => {
-                list.appendChild(createTrackCard(item));
-            });
-            playlist = [...playlist, ...items];
-        } catch (e) { console.error(e); }
-    };
-
-    document.getElementById('playPauseBtn').onclick = () => {
+    $('#playPauseBtn').click(() => {
         const iframe = document.getElementById('ytIframe');
         if (!iframe) return;
         if (isPlaying) {
             iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-            document.getElementById('playPauseBtn').innerText = '▶';
+            $('#playPauseBtn').text('▶');
         } else {
             iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-            document.getElementById('playPauseBtn').innerText = '⏸';
+            $('#playPauseBtn').text('⏸');
         }
         isPlaying = !isPlaying;
-    };
+    });
 
-    document.getElementById('nextBtn').onclick = () => {
-        if (currentIndex < playlist.length - 1) playTrack(playlist[currentIndex + 1]);
-    };
+    $('#nextBtn').click(() => { if (currentIndex < playlist.length - 1) playTrack(playlist[currentIndex + 1]); });
+    $('#prevBtn').click(() => { if (currentIndex > 0) playTrack(playlist[currentIndex - 1]); });
 
-    document.getElementById('prevBtn').onclick = () => {
-        if (currentIndex > 0) playTrack(playlist[currentIndex - 1]);
-    };
-
-    // 初期読み込み
     loadRecommendations();
 </script>
 </body>
