@@ -172,8 +172,10 @@ $(document).ready(function() {
     $('#downloadBtn').click(() => $('#downloadPanel').toggle());
     $('#startDl').click(function() {
         const type = $('#dlType').val();
+        const selectedUrl = $('#qualitySelect').val();
         if (type === 'audio') window.open(videoData.audioUrl, '_blank');
-        else window.open(videoData.stream_url, '_blank');
+        else if (type === 'video') window.open(selectedUrl, '_blank');
+        else window.open(selectedUrl, '_blank'); // 動画+音声の場合も選択した画質を優先
     });
 
     // 画質ラベル
