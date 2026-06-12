@@ -27,10 +27,13 @@
         #shortsOverlay.active { display: flex; }
         .shorts-container { flex: 1; position: relative; }
         .shorts-video-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .shorts-video-wrapper video { max-width: 100%; max-height: 100%; }
+        .shorts-video-wrapper video, .shorts-video-wrapper iframe { max-width: 100%; max-height: 100%; width: 100%; height: 100%; border: none; }
         .shorts-close { position: absolute; top: 20px; left: 20px; font-size: 32px; color: white; cursor: pointer; z-index: 10001; }
         .shorts-controls { position: absolute; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 20px; z-index: 10001; }
         .shorts-btn { background: rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 24px; }
+        .shorts-info { position: absolute; bottom: 20px; left: 20px; right: 80px; color: white; z-index: 10001; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .shorts-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .shorts-author { font-size: 0.9rem; opacity: 0.9; }
     </style>
 </head>
 <body class="bg-gray-900 font-sans">
@@ -56,7 +59,7 @@
     <section class="hero-section">
         <div class="text-center">
             <a href="/blog/b/wkthelp"><h1 class="text-4xl font-bold text-white mb-4">わかめtube Plus</h1></a>
-            <p class="text-lg text-gray-400 mb-6">好きな動画を検索してみましょう！</p>
+            <h2 class="text-lg text-gray-400 mb-6">好きな動画を検索してみましょう！</h2>
             <form action="/wkt/s" method="get" id="searchForm">
               <input type="text" name="q" id="searchbox" placeholder="キーワード、もしくはYouTubeのURLを入力..." class="searchbox">
             </form>
@@ -77,13 +80,13 @@
         </div>
     </section>
 
-    <div id="settingsPanel" class="fixed top-0 left-0 w-full bg-white dark:bg-gray-900 shadow-lg p-6 -translate-y-full duration-300">
+    <div id="settingsPanel" class="fixed top-0 left-0 w-full bg-white dark:bg-gray-900 shadow-lg p-6 -translate-y-full duration-300 z-[10002]">
         <div class="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white max-w-2xl mx-auto p-6 rounded-lg shadow-md">
           <h1 class="text-2xl font-bold mb-4">再生方法の設定</h1>
           <form id="settingsForm" class="space-y-4">
-            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="normal" class="mr-2"> <span class="font-semibold">通常</span></label>
-            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="edu" class="mr-2"> <span class="font-semibold">Education</span></label>
-            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="nocookie" class="mr-2"> <span class="font-semibold">Nocookie</span></label>
+            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="normal" class="mr-2"> <span class="font-semibold">通常 (ストリーム)</span></label>
+            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="edu" class="mr-2"> <span class="font-semibold">Education (Choco方式)</span></label>
+            <label class="block p-4 border rounded-lg cursor-pointer"><input type="radio" name="playbackMode" value="nocookie" class="mr-2"> <span class="font-semibold">Nocookie (埋め込み)</span></label>
             <button type="button" id="saveButton" class="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">保存</button>
           </form>
           <button id="closeSettings" class="absolute top-4 right-4 text-4xl font-bold">×</button>
@@ -93,6 +96,7 @@
     <div id="shortsOverlay">
         <div class="shorts-close" id="shortsClose">×</div>
         <div class="shorts-container" id="shortsContainer"></div>
+        <div class="shorts-info" id="shortsInfo"></div>
         <div class="shorts-controls"><div class="shorts-btn" id="shortsNext">↓</div><div class="shorts-btn" id="shortsPrev">↑</div></div>
     </div>
 
@@ -112,15 +116,21 @@ document.getElementById("searchForm").addEventListener("submit", function(e) {
 });
 
 // ==========================================
-// Shorts 機能 (追加)
+// Shorts 機能 (ChocoTube-Plus 方式導入)
 // ==========================================
 (function() {
     let shorts = []; let current = 0; let loading = false;
     const overlay = document.getElementById('shortsOverlay');
     const container = document.getElementById('shortsContainer');
+    const info = document.getElementById('shortsInfo');
+
+    function getPlaybackMode() {
+        const m = document.cookie.match(/playbackMode=([^;]+)/);
+        return m ? m[1] : 'normal';
+    }
 
     document.getElementById('shortsBtn').onclick = () => { overlay.classList.add('active'); if (shorts.length === 0) loadMore(); else play(current); };
-    document.getElementById('shortsClose').onclick = () => { overlay.classList.remove('active'); const v = container.querySelector('video'); if (v) v.pause(); const a = container.querySelector('audio'); if (a) a.pause(); };
+    document.getElementById('shortsClose').onclick = () => { overlay.classList.remove('active'); container.innerHTML = ''; };
 
     async function loadMore() {
         if (loading) return; loading = true;
@@ -130,19 +140,15 @@ document.getElementById("searchForm").addEventListener("submit", function(e) {
             const res = await fetch(`/wkt/back/search?q=${encodeURIComponent(q)}&type=video`);
             const html = await res.text();
             
-            // 動画ID抽出ロジックを強化
             const idSet = new Set();
             const regex = /\/wkt\/watch\/([a-zA-Z0-9_-]{11})/g;
             let match;
-            while ((match = regex.exec(html)) !== null) {
-                idSet.add(match[1]);
-            }
+            while ((match = regex.exec(html)) !== null) { idSet.add(match[1]); }
             
             if (idSet.size > 0) {
                 const newIds = Array.from(idSet).filter(id => !shorts.find(v => v.id === id));
-                // 5本ずつ追加するように調整
                 newIds.slice(0, 5).forEach(id => shorts.push({ id }));
-                if (current === 0 && shorts.length > 0) play(0);
+                if (current === 0 && shorts.length > 0 && !container.querySelector('video, iframe')) play(0);
             }
         } catch (e) { console.error(e); } finally { loading = false; }
     }
@@ -150,18 +156,40 @@ document.getElementById("searchForm").addEventListener("submit", function(e) {
     async function play(idx) {
         if (idx < 0 || idx >= shorts.length) return; current = idx;
         container.innerHTML = '<div class="text-white text-center mt-20">読み込み中...</div>';
+        info.innerHTML = '';
         if (idx >= shorts.length - 2) loadMore();
+        
+        const videoId = shorts[idx].id;
+        const mode = getPlaybackMode();
+
         try {
-            const res = await fetch(`/wkt/back/next/${shorts[idx].id}`);
-            const data = await res.json();
-            let vUrl = data.stream_url; let aUrl = data.audioUrl || '';
-            if (data.streamUrls) { const t = data.streamUrls.find(s => s.resolution?.includes('720') && s.container === 'mp4') || data.streamUrls[0]; if (t) vUrl = t.url; }
-            container.innerHTML = `<div class="shorts-video-wrapper"><video id="sv" src="${vUrl}" loop playsinline style="width:100%;height:100%"></video><audio id="sa" src="${aUrl}" loop></audio></div>`;
-            const v = document.getElementById('sv'); const a = document.getElementById('sa');
-            v.onplay = () => { if (a.src && a.src !== window.location.href) a.play(); };
-            v.onpause = () => a.pause();
-            v.onseeking = () => a.currentTime = v.currentTime;
-            v.play().catch(() => { v.muted = true; v.play(); });
+            // メタデータ取得
+            const infoRes = await fetch(`/wkt/back/info/${videoId}`);
+            const meta = await infoRes.json();
+            info.innerHTML = `<div class="shorts-title">${meta.title || ''}</div><div class="shorts-author">${meta.author || ''}</div>`;
+
+            if (mode === 'edu' || mode === 'nocookie') {
+                // Choco方式 (Iframe)
+                const embedUrl = mode === 'edu' 
+                    ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&modestbranding=1&rel=0`
+                    : `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+                container.innerHTML = `<div class="shorts-video-wrapper"><iframe src="${embedUrl}" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>`;
+            } else {
+                // 通常方式 (Stream)
+                const res = await fetch(`/wkt/back/next/${videoId}`);
+                const data = await res.json();
+                let vUrl = data.stream_url; let aUrl = data.audioUrl || '';
+                if (data.streamUrls) { 
+                    const t = data.streamUrls.find(s => s.resolution?.includes('720') && s.container === 'mp4') || data.streamUrls[0]; 
+                    if (t) vUrl = t.url; 
+                }
+                container.innerHTML = `<div class="shorts-video-wrapper"><video id="sv" src="${vUrl}" loop playsinline controls style="width:100%;height:100%"></video><audio id="sa" src="${aUrl}" loop></audio></div>`;
+                const v = document.getElementById('sv'); const a = document.getElementById('sa');
+                v.onplay = () => { if (a.src && a.src !== window.location.href) a.play(); };
+                v.onpause = () => a.pause();
+                v.onseeking = () => a.currentTime = v.currentTime;
+                v.play().catch(() => { v.muted = true; v.play(); });
+            }
         } catch (e) { container.innerHTML = '<div class="text-white text-center mt-20">エラーが発生しました</div>'; }
     }
     document.getElementById('shortsNext').onclick = () => play(current + 1);
@@ -169,15 +197,28 @@ document.getElementById("searchForm").addEventListener("submit", function(e) {
 })();
 
 // ==========================================
-// 設定パネル (維持)
+// 設定パネル (維持・拡張)
 // ==========================================
-document.getElementById('openSettings').onclick = () => document.getElementById('settingsPanel').classList.remove('-translate-y-full');
-document.getElementById('closeSettings').onclick = () => document.getElementById('settingsPanel').classList.add('-translate-y-full');
-document.getElementById('saveButton').onclick = () => {
-    const mode = document.querySelector('input[name=playbackMode]:checked').value;
-    document.cookie = `playbackMode=${mode}; path=/; max-age=31536000`;
-    document.getElementById('settingsPanel').classList.add('-translate-y-full');
-};
+(function() {
+    const panel = document.getElementById('settingsPanel');
+    const form = document.getElementById('settingsForm');
+    
+    function updateSelected() {
+        const m = document.cookie.match(/playbackMode=([^;]+)/);
+        const mode = m ? m[1] : 'normal';
+        const radio = form.querySelector(`input[value="${mode}"]`);
+        if (radio) radio.checked = true;
+    }
+
+    document.getElementById('openSettings').onclick = () => { updateSelected(); panel.classList.remove('-translate-y-full'); };
+    document.getElementById('closeSettings').onclick = () => panel.classList.add('-translate-y-full');
+    document.getElementById('saveButton').onclick = () => {
+        const mode = form.querySelector('input[name=playbackMode]:checked').value;
+        document.cookie = `playbackMode=${mode}; path=/; max-age=31536000`;
+        panel.classList.add('-translate-y-full');
+        alert('設定を保存しました。');
+    };
+})();
 </script>
 </body>
 </html>
