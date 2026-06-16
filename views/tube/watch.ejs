@@ -173,19 +173,28 @@ $(document).ready(function() {
     $('#startDl').click(function() {
         const type = $('#dlType').val();
         const selectedUrl = $('#qualitySelect').val();
-        if (type === 'audio') window.open(videoData.audioUrl, '_blank');
-        else if (type === 'video') window.open(selectedUrl, '_blank');
-        else window.open(selectedUrl, '_blank'); // 動画+音声の場合も選択した画質を優先
+        if (type === 'audio') {
+            window.open(videoData.audioUrl, '_blank');
+        } else if (type === 'video') {
+            window.open(selectedUrl, '_blank');
+        } else {
+            window.open(selectedUrl, '_blank');
+        }
     });
 
     // 画質ラベル
-    if (videoData.streamUrls) {
-        $('#qualitySelect').empty();
-        videoData.streamUrls.forEach(s => {
+    if (videoData.streamUrls && videoData.streamUrls.length > 0) {
+        $(\'#qualitySelect\').empty();
+        // 音声を含む画質を優先的に設定
+        const streamWithAudio = videoData.streamUrls.filter(s => s.hasAudio);
+        const sortedStreams = streamWithAudio.length > 0 ? streamWithAudio : videoData.streamUrls;
+        
+        sortedStreams.forEach(s => {
             let label = s.resolution;
-            if (label.includes('2160')) label = '4K - ' + label;
-            if (label.includes('4320')) label = '8K - ' + label;
-            $('#qualitySelect').append(`<option value="${s.url}">${label}</option>`);
+            if (label.includes(\'2160\')) label = \'4K - \' + label;
+            if (label.includes(\'4320\')) label = \'8K - \' + label;
+            if (s.hasAudio) label += \' (音声付き)\';
+            $(\'#qualitySelect\').append(`<option value="${s.url}">${label}</option>`);
         });
     }
 
